@@ -1,7 +1,7 @@
 import { network } from "hardhat";
 import { encodeFunctionData } from "viem";
 
-const FACTORY_ADDRESS = "0x84eb65fff1d8418ca3b625a0b4a7b39b6c335688";
+const FACTORY_ADDRESS = "0x20873f4e65e3d306a4169af722c8a77991dac92a";
 
 const FACTORY_ABI = [
   {
