@@ -1,6 +1,6 @@
 import { network } from "hardhat";
 
-const COMPANY_ADDRESS = "0x35217ab76f51f0C36b2fEE8b7a072EEd931b6e3A";
+const COMPANY_ADDRESS = "0x3757326524eF3abcA0573Bf838792bE0E6CB6088";
 
 async function main() {
   const { viem } = await network.connect();
@@ -21,6 +21,13 @@ async function main() {
           inputs: [],
           outputs: [],
         },
+        { type: "error", name: "OnlyOwner", inputs: [] },
+        { type: "error", name: "OnlyScheduler", inputs: [] },
+        { type: "error", name: "OnlyFactory", inputs: [] },
+        { type: "error", name: "AlreadyRunning", inputs: [] },
+        { type: "error", name: "InsufficientFee", inputs: [] },
+        { type: "error", name: "DepositFailed", inputs: [] },
+        { type: "error", name: "ScheduleFailed", inputs: [] },
       ],
       functionName: "start",
       account: walletClient.account,
@@ -36,6 +43,7 @@ async function main() {
       if (err.cause.reason) console.log("Decoded reason:", err.cause.reason);
       if (err.cause.cause) {
         console.log("Nested cause:", err.cause.cause.shortMessage || err.cause.cause.message);
+        if (err.cause.cause.errorName) console.log(">>> DECODED ERROR NAME:", err.cause.cause.errorName);
       }
     }
   }
