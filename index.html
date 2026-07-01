@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ritual Company Factory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0b0d;
+    --panel:#14161a;
+    --panel-2:#1b1e24;
+    --line:#262a31;
+    --text:#e8e6e1;
+    --muted:#8b8d93;
+    --copper:#c9793b;
+    --copper-dim:#8a5228;
+    --teal:#3ba9c9;
+    --good:#4ade80;
+    --bad:#f87171;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  header{
+    border-bottom:1px solid var(--line);
+    padding:20px 24px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    position:sticky;
+    top:0;
+    background:rgba(10,11,13,0.92);
+    backdrop-filter:blur(8px);
+    z-index:10;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand .mark{
+    width:28px;height:28px;
+    border:2px solid var(--copper);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:700;
+    font-size:13px;
+    color:var(--copper);
+    transform:rotate(45deg);
+  }
+  .brand .mark span{transform:rotate(-45deg);}
+  .brand h1{font-size:16px;font-weight:600;margin:0;letter-spacing:0.02em;}
+  .brand .sub{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:0.05em;}
+
+  nav{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px;}
+  nav button{
+    background:transparent;border:none;color:var(--muted);
+    padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;
+    cursor:pointer;font-family:'Inter',sans-serif;
+  }
+  nav button.active{background:var(--panel-2);color:var(--text);}
+
+  .wallet-btn{
+    background:var(--copper-dim);
+    color:#fff;border:none;
+    padding:9px 16px;border-radius:6px;
+    font-size:13px;font-weight:600;cursor:pointer;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .wallet-btn.connected{background:var(--panel-2);border:1px solid var(--good);color:var(--good);}
+
+  main{max-width:960px;margin:0 auto;padding:32px 24px 80px;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .hero{margin-bottom:32px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;color:var(--copper);
+    letter-spacing:0.12em;text-transform:uppercase;
+    margin-bottom:8px;
+  }
+  h2{font-size:26px;margin:0 0 8px;font-weight:600;}
+  .lede{color:var(--muted);font-size:14px;line-height:1.6;max-width:560px;}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:24px;
+    margin-bottom:20px;
+  }
+  .panel h3{margin:0 0 16px;font-size:14px;font-weight:600;color:var(--text);}
+
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;}
+  input, select, textarea{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);
+    color:var(--text);padding:10px 12px;border-radius:6px;
+    font-size:13px;font-family:'Inter',sans-serif;margin-bottom:14px;
+  }
+  textarea{min-height:70px;resize:vertical;font-family:'Inter',sans-serif;}
+  input:focus, select:focus, textarea:focus{outline:none;border-color:var(--copper);}
+
+  .btn{
+    background:var(--copper);color:#0a0b0d;border:none;
+    padding:11px 20px;border-radius:6px;font-size:13px;font-weight:700;
+    cursor:pointer;font-family:'IBM Plex Mono',monospace;letter-spacing:0.02em;
+  }
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn.secondary{background:transparent;border:1px solid var(--line);color:var(--text);}
+  .btn.small{padding:7px 12px;font-size:11px;}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:640px){.grid{grid-template-columns:1fr;}}
+
+  .company-card{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:18px;position:relative;overflow:hidden;
+  }
+  .company-card::before{
+    content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--copper);
+  }
+  .card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+  .card-title{font-size:15px;font-weight:600;}
+  .card-addr{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:2px;}
+  .live-dot{
+    width:8px;height:8px;border-radius:50%;background:var(--good);
+    box-shadow:0 0 0 3px rgba(74,222,128,0.15);
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+  .gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0;}
+  .gauge{text-align:left;}
+  .gauge .val{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:700;color:var(--copper);}
+  .gauge .lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+
+  .log-row{
+    border-top:1px solid var(--line);padding:10px 0;font-size:12px;
+  }
+  .log-row .out{color:var(--text);margin-top:4px;font-style:italic;color:var(--muted);}
+
+  .empty{
+    text-align:center;padding:60px 20px;color:var(--muted);
+    border:1px dashed var(--line);border-radius:10px;font-size:13px;
+  }
+
+  .swap-card{max-width:420px;margin:0 auto;}
+  .swap-io{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:8px;}
+  .swap-io .row{display:flex;justify-content:space-between;align-items:center;}
+  .swap-io input{background:transparent;border:none;font-size:20px;margin:0;padding:0;font-family:'IBM Plex Mono',monospace;}
+  .swap-io select{width:auto;background:var(--panel);margin:0;}
+  .swap-arrow{text-align:center;color:var(--copper);font-size:18px;margin:2px 0;}
+  .faucet-row{display:flex;gap:8px;margin-top:14px;}
+
+  .status-line{font-size:12px;color:var(--muted);margin-top:12px;font-family:'IBM Plex Mono',monospace;}
+  .status-line.err{color:var(--bad);}
+  .status-line.ok{color:var(--good);}
+
+  footer{border-top:1px solid var(--line);padding:20px 24px;text-align:center;color:var(--muted);font-size:11px;font-family:'IBM Plex Mono',monospace;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="mark"><span>N</span></div>
+    <div>
+      <h1>Company Factory</h1>
+      <div class="sub">RITUAL CHAIN · TESTNET 1979</div>
+    </div>
+  </div>
+  <nav>
+    <button class="tab-btn active" data-view="factory">Factory</button>
+    <button class="tab-btn" data-view="swap">Swap</button>
+  </nav>
+  <button class="wallet-btn" id="connectBtn">Connect Wallet</button>
+</header>
+
+<main>
+
+  <!-- ============ FACTORY VIEW ============ -->
+  <section class="view active" id="view-factory">
+    <div class="hero">
+      <div class="eyebrow">Agent-Native Companies</div>
+      <h2>Spin up a company that runs itself</h2>
+      <p class="lede">Each company you deploy gets its own treasury, wakes itself on a Scheduler loop, and answers paid requests through the Ritual LLM precompile — no server, no keeper, no you.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Deploy a new company</h3>
+      <label>Company type</label>
+      <input id="companyType" placeholder="e.g. Reputation Scorer" />
+      <label>System prompt (defines its job)</label>
+      <textarea id="systemPrompt" placeholder="You are a wallet reputation scorer. Given a wallet address and context, return a score from 0-1000 with brief reasoning."></textarea>
+      <label>Fee per request (RITUAL)</label>
+      <input id="feePerRequest" type="number" step="0.0001" value="0.001" />
+      <label>Initial treasury funding (RITUAL)</label>
+      <input id="initialFunding" type="number" step="0.001" value="0.05" />
+      <button class="btn" id="deployBtn">Deploy Company</button>
+      <div class="status-line" id="deployStatus"></div>
+    </div>
+
+    <div class="panel">
+      <h3>Live companies (<span id="companyCount">0</span>)</h3>
+      <div id="companyList"></div>
+    </div>
+  </section>
+
+  <!-- ============ SWAP VIEW ============ -->
+  <section class="view" id="view-swap">
+    <div class="hero">
+      <div class="eyebrow">Testnet Demo</div>
+      <h2>Swap RTA / RTB</h2>
+      <p class="lede">Ritual testnet has no deep native liquidity, so this pool runs on two demo tokens you can mint from the faucet below — a real on-chain swap, testnet-scale liquidity.</p>
+    </div>
+
+    <div class="panel swap-card">
+      <div class="swap-io">
+        <label>From</label>
+        <div class="row">
+          <input id="swapAmountIn" type="number" placeholder="0.0" />
+          <select id="tokenIn"><option value="A">RTA</option><option value="B">RTB</option></select>
+        </div>
+      </div>
+      <div class="swap-arrow">↓</div>
+      <div class="swap-io">
+        <label>To (estimated)</label>
+        <div class="row">
+          <input id="swapAmountOut" type="text" placeholder="0.0" disabled />
+          <select id="tokenOut" disabled><option value="B">RTB</option></select>
+        </div>
+      </div>
+      <button class="btn" id="swapBtn" style="width:100%;margin-top:10px;">Approve &amp; Swap</button>
+      <div class="status-line" id="swapStatus"></div>
+
+      <div class="faucet-row">
+        <button class="btn secondary small" id="faucetABtn">Get 1000 RTA</button>
+        <button class="btn secondary small" id="faucetBBtn">Get 1000 RTB</button>
+      </div>
+      <div class="status-line mono" id="poolInfo" style="margin-top:16px;"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>ritual-agent-factory · deployed contracts on Ritual Chain testnet (1979) · testnet tokens have no value</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
+<script>
+// ============================================================
+// CONFIG — fill these in after running the hardhat ignition deploy
+// (see README.md). The app will not function until these are set.
+// ============================================================
+const CONFIG = {
+  chainId: 1979,
+  chainIdHex: "0x7BB",
+  rpcUrl: "https://rpc.ritualfoundation.org",
+  chainName: "Ritual Chain Testnet",
+  explorer: "https://explorer.ritualfoundation.org",
+  factoryAddress: "0x0000000000000000000000000000000000000000", // <-- FILL IN
+  tokenAAddress:  "0x0000000000000000000000000000000000000000", // <-- FILL IN
+  tokenBAddress:  "0x0000000000000000000000000000000000000000", // <-- FILL IN
+  swapAddress:    "0x0000000000000000000000000000000000000000", // <-- FILL IN
+};
+
+const FACTORY_ABI = [
+  "function deployCompany(string companyType, string systemPrompt, uint256 feePerRequest) payable returns (address)",
+  "function getAllCompanies() view returns (tuple(address addr,address owner,string companyType,uint256 feePerRequest,uint256 createdAt)[])",
+  "function getCompanyCount() view returns (uint256)",
+  "event CompanyDeployed(address indexed companyAddress, address indexed owner, string companyType, uint256 feePerRequest, uint256 initialFunding)"
+];
+
+const COMPANY_ABI = [
+  "function companyType() view returns (string)",
+  "function running() view returns (bool)",
+  "function wakeCount() view returns (uint256)",
+  "function requestCount() view returns (uint256)",
+  "function treasuryBalance() view returns (uint256)",
+  "function lastHeartbeat() view returns (string)",
+  "function feePerRequest() view returns (uint256)",
+  "function requestService(string input) payable returns (string)",
+  "function getRecentLog() view returns (tuple(address requester,string input,string output,uint256 timestamp)[])"
+];
+
+const ERC20_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function faucet()"
+];
+
+const SWAP_ABI = [
+  "function swap(address tokenIn, uint256 amountIn, uint256 minAmountOut) returns (uint256)",
+  "function quote(address tokenIn, uint256 amountIn) view returns (uint256)",
+  "function getReserves() view returns (uint256, uint256)"
+];
+
+let provider, signer, userAddress;
+
+// ---- nav ----
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("view-" + btn.dataset.view).classList.add("active");
+    if (btn.dataset.view === "swap") refreshPool();
+    if (btn.dataset.view === "factory") loadCompanies();
+  });
+});
+
+// ---- wallet connect ----
+document.getElementById("connectBtn").addEventListener("click", connectWallet);
+
+async function connectWallet() {
+  if (!window.ethereum) {
+    alert("No wallet found. Install MetaMask to continue.");
+    return;
+  }
+  try {
+    await window.ethereum.request({ method: "eth_requestAccounts" });
+    await ensureRitualNetwork();
+    provider = new ethers.BrowserProvider(window.ethereum, "any");
+    signer = await provider.getSigner();
+    userAddress = await signer.getAddress();
+    const btn = document.getElementById("connectBtn");
+    btn.textContent = userAddress.slice(0, 6) + "…" + userAddress.slice(-4);
+    btn.classList.add("connected");
+    loadCompanies();
+    refreshPool();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function ensureRitualNetwork() {
+  try {
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: CONFIG.chainIdHex }],
+    });
+  } catch (switchError) {
+    if (switchError.code === 4902) {
+      await window.ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [{
+          chainId: CONFIG.chainIdHex,
+          chainName: CONFIG.chainName,
+          rpcUrls: [CONFIG.rpcUrl],
+          nativeCurrency: { name: "RITUAL", symbol: "RITUAL", decimals: 18 },
+          blockExplorerUrls: [CONFIG.explorer],
+        }],
+      });
+    }
+  }
+}
+
+// ---- factory ----
+document.getElementById("deployBtn").addEventListener("click", deployCompany);
+
+async function deployCompany() {
+  const statusEl = document.getElementById("deployStatus");
+  if (!signer) { statusEl.textContent = "Connect your wallet first."; statusEl.className = "status-line err"; return; }
+
+  const companyType = document.getElementById("companyType").value.trim();
+  const systemPrompt = document.getElementById("systemPrompt").value.trim();
+  const feePerRequest = document.getElementById("feePerRequest").value;
+  const initialFunding = document.getElementById("initialFunding").value;
+
+  if (!companyType || !systemPrompt) {
+    statusEl.textContent = "Company type and system prompt are required.";
+    statusEl.className = "status-line err";
+    return;
+  }
+
+  try {
+    statusEl.textContent = "Confirm the transaction in your wallet…";
+    statusEl.className = "status-line";
+    const factory = new ethers.Contract(CONFIG.factoryAddress, FACTORY_ABI, signer);
+    const tx = await factory.deployCompany(
+      companyType,
+      systemPrompt,
+      ethers.parseEther(feePerRequest || "0"),
+      { value: ethers.parseEther(initialFunding || "0") }
+    );
+    statusEl.textContent = "Deploying — waiting for confirmation…";
+    await tx.wait();
+    statusEl.textContent = "Company deployed and running.";
+    statusEl.className = "status-line ok";
+    document.getElementById("companyType").value = "";
+    document.getElementById("systemPrompt").value = "";
+    loadCompanies();
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = "Deploy failed: " + (e.shortMessage || e.message || "unknown error");
+    statusEl.className = "status-line err";
+  }
+}
+
+async function loadCompanies() {
+  const listEl = document.getElementById("companyList");
+  const countEl = document.getElementById("companyCount");
+  if (!provider) {
+    try { provider = new ethers.BrowserProvider(window.ethereum, "any"); } catch (e) { return; }
+  }
+  try {
+    const factory = new ethers.Contract(CONFIG.factoryAddress, FACTORY_ABI, provider);
+    const all = await factory.getAllCompanies();
+    countEl.textContent = all.length;
+
+    if (all.length === 0) {
+      listEl.innerHTML = '<div class="empty">No companies deployed yet. Be the first.</div>';
+      return;
+    }
+
+    listEl.innerHTML = "";
+    for (const info of all) {
+      const card = document.createElement("div");
+      card.className = "company-card";
+      card.style.marginBottom = "14px";
+      card.innerHTML = `
+        <div class="card-head">
+          <div>
+            <div class="card-title">${escapeHtml(info.companyType)}</div>
+            <div class="card-addr">${info.addr}</div>
+          </div>
+          <div class="live-dot" title="running"></div>
+        </div>
+        <div class="gauges">
+          <div class="gauge"><div class="val" data-field="wakes">–</div><div class="lbl">Wake Cycles</div></div>
+          <div class="gauge"><div class="val" data-field="requests">–</div><div class="lbl">Requests</div></div>
+          <div class="gauge"><div class="val" data-field="treasury">–</div><div class="lbl">Treasury (RITUAL)</div></div>
+        </div>
+        <div class="log-row" data-field="heartbeat" style="border-top:none;padding-top:0;color:var(--muted);font-style:italic;"></div>
+      `;
+      listEl.appendChild(card);
+      hydrateCompanyCard(card, info.addr);
+    }
+  } catch (e) {
+    console.error(e);
+    listEl.innerHTML = '<div class="empty">Could not load companies. Check that CONFIG.factoryAddress is set and you\'re on Ritual testnet.</div>';
+  }
+}
+
+async function hydrateCompanyCard(card, addr) {
+  try {
+    const company = new ethers.Contract(addr, COMPANY_ABI, provider);
+    const [wakes, requests, treasury, heartbeat] = await Promise.all([
+      company.wakeCount(), company.requestCount(), company.treasuryBalance(), company.lastHeartbeat().catch(() => "")
+    ]);
+    card.querySelector('[data-field="wakes"]').textContent = wakes.toString();
+    card.querySelector('[data-field="requests"]').textContent = requests.toString();
+    card.querySelector('[data-field="treasury"]').textContent = Number(ethers.formatEther(treasury)).toFixed(4);
+    card.querySelector('[data-field="heartbeat"]').textContent = heartbeat ? '"' + heartbeat + '"' : "awaiting first heartbeat…";
+  } catch (e) {
+    console.error("hydrate failed for", addr, e);
+  }
+}
+
+// ---- swap ----
+document.getElementById("tokenIn").addEventListener("change", updateSwapEstimate);
+document.getElementById("swapAmountIn").addEventListener("input", updateSwapEstimate);
+document.getElementById("faucetABtn").addEventListener("click", () => claimFaucet("A"));
+document.getElementById("faucetBBtn").addEventListener("click", () => claimFaucet("B"));
+document.getElementById("swapBtn").addEventListener("click", doSwap);
+
+function tokenAddr(sym) { return sym === "A" ? CONFIG.tokenAAddress : CONFIG.tokenBAddress; }
+
+async function updateSwapEstimate() {
+  const inSym = document.getElementById("tokenIn").value;
+  document.getElementById("tokenOut").innerHTML = inSym === "A" ? "<option>RTB</option>" : "<option>RTA</option>";
+  const amountIn = document.getElementById("swapAmountIn").value;
+  const outEl = document.getElementById("swapAmountOut");
+  if (!amountIn || Number(amountIn) <= 0) { outEl.value = ""; return; }
+  try {
+    if (!provider) provider = new ethers.BrowserProvider(window.ethereum, "any");
+    const swapContract = new ethers.Contract(CONFIG.swapAddress, SWAP_ABI, provider);
+    const out = await swapContract.quote(tokenAddr(inSym), ethers.parseEther(amountIn));
+    outEl.value = Number(ethers.formatEther(out)).toFixed(4);
+  } catch (e) {
+    outEl.value = "–";
+  }
+}
+
+async function claimFaucet(sym) {
+  const statusEl = document.getElementById("swapStatus");
+  if (!signer) { statusEl.textContent = "Connect your wallet first."; statusEl.className = "status-line err"; return; }
+  try {
+    const token = new ethers.Contract(tokenAddr(sym), ERC20_ABI, signer);
+    statusEl.textContent = "Claiming from faucet…";
+    statusEl.className = "status-line";
+    const tx = await token.faucet();
+    await tx.wait();
+    statusEl.textContent = "Claimed 1000 RT" + sym + ".";
+    statusEl.className = "status-line ok";
+  } catch (e) {
+    statusEl.textContent = "Faucet failed: " + (e.shortMessage || e.message || "cooldown active");
+    statusEl.className = "status-line err";
+  }
+}
+
+async function doSwap() {
+  const statusEl = document.getElementById("swapStatus");
+  if (!signer) { statusEl.textContent = "Connect your wallet first."; statusEl.className = "status-line err"; return; }
+  const inSym = document.getElementById("tokenIn").value;
+  const amountIn = document.getElementById("swapAmountIn").value;
+  if (!amountIn || Number(amountIn) <= 0) { statusEl.textContent = "Enter an amount."; statusEl.className = "status-line err"; return; }
+
+  try {
+    const token = new ethers.Contract(tokenAddr(inSym), ERC20_ABI, signer);
+    const swapContract = new ethers.Contract(CONFIG.swapAddress, SWAP_ABI, signer);
+    const amountInWei = ethers.parseEther(amountIn);
+
+    const allowance = await token.allowance(userAddress, CONFIG.swapAddress);
+    if (allowance < amountInWei) {
+      statusEl.textContent = "Approving token spend…";
+      statusEl.className = "status-line";
+      const approveTx = await token.approve(CONFIG.swapAddress, amountInWei);
+      await approveTx.wait();
+    }
+
+    statusEl.textContent = "Swapping…";
+    const quoted = await swapContract.quote(tokenAddr(inSym), amountInWei);
+    const minOut = (quoted * 95n) / 100n; // 5% slippage tolerance
+    const tx = await swapContract.swap(tokenAddr(inSym), amountInWei, minOut);
+    await tx.wait();
+    statusEl.textContent = "Swap complete.";
+    statusEl.className = "status-line ok";
+    refreshPool();
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = "Swap failed: " + (e.shortMessage || e.message || "unknown error");
+    statusEl.className = "status-line err";
+  }
+}
+
+async function refreshPool() {
+  const infoEl = document.getElementById("poolInfo");
+  try {
+    if (!provider) provider = new ethers.BrowserProvider(window.ethereum, "any");
+    const swapContract = new ethers.Contract(CONFIG.swapAddress, SWAP_ABI, provider);
+    const [rA, rB] = await swapContract.getReserves();
+    infoEl.textContent = `pool reserves — RTA: ${Number(ethers.formatEther(rA)).toFixed(2)} · RTB: ${Number(ethers.formatEther(rB)).toFixed(2)}`;
+  } catch (e) {
+    infoEl.textContent = "pool reserves unavailable — check CONFIG.swapAddress";
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// initial load attempt (read-only, no wallet required)
+window.addEventListener("load", () => {
+  loadCompanies();
+});
+</script>
+</body>
+</html>
