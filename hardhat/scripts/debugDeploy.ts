@@ -1,11 +1,12 @@
-import hre from "hardhat";
+import { network } from "hardhat";
 import { parseEther } from "viem";
 
 const FACTORY_ADDRESS = "0xE9619D9F67630B71d125b8d97D38Ca517F5CEb8A";
 
 async function main() {
-  const publicClient = await hre.viem.getPublicClient();
-  const [walletClient] = await hre.viem.getWalletClients();
+  const { viem } = await network.connect();
+  const publicClient = await viem.getPublicClient();
+  const [walletClient] = await viem.getWalletClients();
 
   console.log("Simulating deployCompany() from:", walletClient.account.address);
 
