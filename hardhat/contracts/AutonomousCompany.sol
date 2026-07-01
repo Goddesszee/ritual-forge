@@ -13,23 +13,12 @@ pragma solidity ^0.8.24;
 //    0x0802 — LLM        (service delivery + heartbeat reasoning, TEE-attested)
 //    Scheduler system contract — self-waking every WAKE_INTERVAL blocks
 //
-//  Pattern mirrors the deployed & proven SovereignRepAgent / AIJudge
-//  contracts: direct interface calls to precompiles, try/catch fallback,
-//  Scheduler re-arms itself inside wakeUp().
+//  LLM integration follows Ritual's documented 30-field request ABI
+//  and TEEServiceRegistry executor lookup exactly (ritual-dapp-llm
+//  skill, Section 7 Solidity Consumer Contract pattern) — the earlier
+//  simplified struct-based interface did not match the real precompile
+//  and every call failed with "ethabi decode failed".
 // ================================================================
-
-interface ILLMPrecompile {
-    struct Message {
-        string role;    // "system" | "user" | "assistant"
-        string content;
-    }
-    struct LLMRequest {
-        Message[] messages;
-        uint32 maxTokens;
-        bool stream;
-    }
-    function complete(LLMRequest calldata req) external returns (string memory text);
-}
 
 interface IScheduler {
     function schedule(
@@ -52,10 +41,34 @@ interface IRitualWallet {
     function deposit(uint256 lockDuration) external payable;
 }
 
+interface ITEEServiceRegistry {
+    struct TEENode {
+        address paymentAddress;
+        address teeAddress;
+        uint8 teeType;
+        bytes publicKey;
+        string endpoint;
+        bytes32 certPubKeyHash;
+        uint8 capability;
+    }
+    struct TEEService {
+        TEENode node;
+        bool isValid;
+        bytes32 workloadId;
+    }
+    function getServicesByCapability(uint8 capability, bool checkValidity)
+        external view returns (TEEService[] memory);
+}
+
 contract AutonomousCompany {
+    struct StorageRef { string platform; string path; string keyRef; }
+
     address internal constant LLM = 0x0000000000000000000000000000000000000802;
     address internal constant SCHEDULER = 0x56e776BAE2DD60664b69Bd5F865F1180ffB7D58B;
     address internal constant RITUAL_WALLET = 0x532F0dF0896F353d8C3DD8cc134e8129DA2a3948;
+    address internal constant TEE_REGISTRY = 0x9644e8562cE0Fe12b4deeC4163c064A8862Bf47F;
+    uint8 internal constant CAPABILITY_LLM = 1;
+    string internal constant MODEL = "zai-org/GLM-4.7-FP8";
 
     uint32 public constant WAKE_INTERVAL = 500; // ~3 min on Ritual testnet
     uint256 public constant SCHEDULER_FEE_DEPOSIT = 0.005 ether;
@@ -99,6 +112,7 @@ contract AutonomousCompany {
     error InsufficientFee();
     error DepositFailed();
     error ScheduleFailed();
+    error NoExecutorAvailable();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert OnlyOwner();
@@ -138,14 +152,11 @@ contract AutonomousCompany {
     }
 
     /// @notice Step 2 only, callable independently for isolated testing.
-    /// Does not set `running` or check AlreadyRunning, pure isolation probe.
     function scheduleOnly() external onlyOwner returns (uint256) {
         return _scheduleWakeup(WAKE_INTERVAL);
     }
 
     function _fundWallet() internal {
-        // Ritual's Scheduler pulls execution fees from RitualWallet, not from
-        // this contract's plain balance. Fund it before the first schedule call.
         uint256 depositAmount = SCHEDULER_FEE_DEPOSIT;
         if (address(this).balance < depositAmount) {
             depositAmount = address(this).balance;
@@ -168,10 +179,13 @@ contract AutonomousCompany {
 
         wakeCount++;
         lastWakeBlock = block.number;
-        lastHeartbeat = _heartbeatCheck();
+        (, string memory content, string memory errMsg) = _callLLM(
+            systemPrompt,
+            "Routine heartbeat check. In under 15 words, state your operating status and readiness for new requests.",
+            256
+        );
+        lastHeartbeat = bytes(content).length > 0 ? content : errMsg;
 
-        // Re-arm — this is what makes the company sovereign: nobody
-        // needs to call it again, it schedules its own next tick.
         scheduleId = _scheduleWakeup(WAKE_INTERVAL);
         emit WokeUp(wakeCount, block.number, lastHeartbeat);
     }
@@ -184,17 +198,8 @@ contract AutonomousCompany {
     }
 
     function _scheduleWakeup(uint32 delay) internal returns (uint256) {
-        // First param after the selector must be a placeholder executionIndex —
-        // the Scheduler overwrites it with the real value at execution time.
         bytes memory data = abi.encodeWithSelector(this.wakeUp.selector, uint256(0));
 
-        // Ritual's Scheduler requires frequency == 1 whenever numCalls == 1
-        // (frequency only has meaning between multiple calls). The actual
-        // delay before this single execution comes from startBlock instead.
-        //
-        // Forward the raw revert reason instead of swallowing it — matches
-        // the proven pattern from PrecompileConsumer.sol so we can see
-        // Ritual's actual error instead of a generic one.
         (bool ok, bytes memory result) = SCHEDULER.call(
             abi.encodeWithSelector(
                 IScheduler.schedule.selector,
@@ -219,30 +224,117 @@ contract AutonomousCompany {
         return abi.decode(result, (uint256));
     }
 
-    // Lightweight self-check the LLM performs every heartbeat —
-    // proves the loop is alive and reasoning, independent of paid requests.
-    function _heartbeatCheck() internal returns (string memory) {
-        ILLMPrecompile.Message[] memory msgs = new ILLMPrecompile.Message[](2);
-        msgs[0] = ILLMPrecompile.Message({
-            role: "system",
-            content: systemPrompt
-        });
-        msgs[1] = ILLMPrecompile.Message({
-            role: "user",
-            content: "Routine heartbeat check. In under 15 words, state your operating status and readiness for new requests."
-        });
+    // ══════════════════════════════════════════════════════════
+    //  LLM — real 30-field precompile call per ritual-dapp-llm skill
+    // ══════════════════════════════════════════════════════════
 
-        ILLMPrecompile.LLMRequest memory req = ILLMPrecompile.LLMRequest({
-            messages: msgs,
-            maxTokens: 60,
-            stream: false
-        });
+    function _getExecutor() internal view returns (address) {
+        ITEEServiceRegistry.TEEService[] memory services =
+            ITEEServiceRegistry(TEE_REGISTRY).getServicesByCapability(CAPABILITY_LLM, true);
+        if (services.length == 0) revert NoExecutorAvailable();
+        return services[0].node.teeAddress;
+    }
 
-        try ILLMPrecompile(LLM).complete(req) returns (string memory result) {
-            return result;
-        } catch {
-            return "heartbeat ok (LLM unavailable this tick)";
+    function _callLLM(string memory sysPrompt, string memory userContent, uint256 maxTokens)
+        internal
+        returns (bool hasError, string memory content, string memory errorMessage)
+    {
+        address executor = _getExecutor();
+
+        string memory messagesJson = string(
+            abi.encodePacked(
+                '[{"role":"system","content":"', _escapeJson(sysPrompt), '"},',
+                '{"role":"user","content":"', _escapeJson(userContent), '"}]'
+            )
+        );
+
+        bytes memory input = abi.encode(
+            executor,
+            new bytes[](0),      // encryptedSecrets
+            uint256(300),        // ttl
+            new bytes[](0),      // secretSignatures
+            bytes(""),           // userPublicKey
+            messagesJson,
+            MODEL,
+            int256(0),           // frequencyPenalty
+            "",                  // logitBiasJson
+            false,               // logprobs
+            int256(maxTokens),   // maxCompletionTokens
+            "",                  // metadataJson
+            "",                  // modalitiesJson
+            uint256(1),          // n
+            true,                // parallelToolCalls
+            int256(0),           // presencePenalty
+            "medium",            // reasoningEffort
+            bytes(""),           // responseFormatData
+            int256(-1),          // seed
+            "auto",              // serviceTier
+            "",                  // stopJson
+            false,               // stream
+            int256(700),         // temperature (0.7 * 1000)
+            bytes(""),           // toolChoiceData
+            bytes(""),           // toolsData
+            int256(-1),          // topLogprobs
+            int256(1000),        // topP (1.0 * 1000)
+            "",                  // user
+            false,               // piiEnabled
+            abi.encode("", "", "") // convoHistory StorageRef, empty = no persisted history
+        );
+
+        (bool ok, bytes memory result) = LLM.call(input);
+        if (!ok) {
+            return (true, "", "LLM precompile call failed");
         }
+
+        (, bytes memory actualOutput) = abi.decode(result, (bytes, bytes));
+
+        bytes memory completionData;
+        (hasError, completionData, , errorMessage, ) = abi.decode(
+            actualOutput, (bool, bytes, bytes, string, StorageRef)
+        );
+
+        if (hasError || completionData.length == 0) {
+            return (hasError, "", errorMessage);
+        }
+
+        content = _extractContent(completionData);
+    }
+
+    function _extractContent(bytes memory completionData) internal pure returns (string memory) {
+        (, , , , , , uint256 choicesCount, bytes[] memory choicesData, ) = abi.decode(
+            completionData, (string, string, uint256, string, string, string, uint256, bytes[], bytes)
+        );
+
+        if (choicesCount == 0 || choicesData.length == 0) {
+            return "";
+        }
+
+        (, , bytes memory messageData) = abi.decode(choicesData[0], (uint256, string, bytes));
+        (, string memory msgContent, , , ) = abi.decode(
+            messageData, (string, string, string, uint256, bytes[])
+        );
+        return msgContent;
+    }
+
+    function _escapeJson(string memory input) internal pure returns (string memory) {
+        bytes memory b = bytes(input);
+        bytes memory result = new bytes(b.length * 2);
+        uint256 j = 0;
+        for (uint256 i = 0; i < b.length; i++) {
+            bytes1 c = b[i];
+            if (c == '"' || c == "\\") {
+                result[j++] = "\\";
+                result[j++] = c;
+            } else if (c == 0x0A) {
+                result[j++] = "\\";
+                result[j++] = "n";
+            } else {
+                result[j++] = c;
+            }
+        }
+        bytes memory trimmed = new bytes(j);
+        for (uint256 k = 0; k < j; k++) trimmed[k] = result[k];
+        return string(trimmed);
     }
 
     // ══════════════════════════════════════════════════════════
@@ -254,27 +346,8 @@ contract AutonomousCompany {
         totalRevenue += msg.value;
         requestCount++;
 
-        ILLMPrecompile.Message[] memory msgs = new ILLMPrecompile.Message[](2);
-        msgs[0] = ILLMPrecompile.Message({
-            role: "system",
-            content: systemPrompt
-        });
-        msgs[1] = ILLMPrecompile.Message({
-            role: "user",
-            content: input
-        });
-
-        ILLMPrecompile.LLMRequest memory req = ILLMPrecompile.LLMRequest({
-            messages: msgs,
-            maxTokens: 200,
-            stream: false
-        });
-
-        try ILLMPrecompile(LLM).complete(req) returns (string memory result) {
-            output = result;
-        } catch {
-            output = "service temporarily unavailable, fee refund not automatic - contact owner";
-        }
+        (, string memory content, string memory errMsg) = _callLLM(systemPrompt, input, 4096);
+        output = bytes(content).length > 0 ? content : errMsg;
 
         _pushLog(msg.sender, input, output);
         emit ServiceDelivered(msg.sender, msg.value, output);
