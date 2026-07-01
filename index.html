@@ -16,7 +16,6 @@
     --muted:#8b8d93;
     --copper:#c9793b;
     --copper-dim:#8a5228;
-    --teal:#3ba9c9;
     --good:#4ade80;
     --bad:#f87171;
   }
@@ -57,14 +56,6 @@
   .brand h1{font-size:16px;font-weight:600;margin:0;letter-spacing:0.02em;}
   .brand .sub{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:0.05em;}
 
-  nav{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px;}
-  nav button{
-    background:transparent;border:none;color:var(--muted);
-    padding:8px 16px;border-radius:6px;font-size:13px;font-weight:500;
-    cursor:pointer;font-family:'Inter',sans-serif;
-  }
-  nav button.active{background:var(--panel-2);color:var(--text);}
-
   .wallet-btn{
     background:var(--copper-dim);
     color:#fff;border:none;
@@ -75,8 +66,6 @@
   .wallet-btn.connected{background:var(--panel-2);border:1px solid var(--good);color:var(--good);}
 
   main{max-width:960px;margin:0 auto;padding:32px 24px 80px;}
-  .view{display:none;}
-  .view.active{display:block;}
 
   .hero{margin-bottom:32px;}
   .eyebrow{
@@ -98,13 +87,13 @@
   .panel h3{margin:0 0 16px;font-size:14px;font-weight:600;color:var(--text);}
 
   label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;}
-  input, select, textarea{
+  input, textarea{
     width:100%;background:var(--panel-2);border:1px solid var(--line);
     color:var(--text);padding:10px 12px;border-radius:6px;
     font-size:13px;font-family:'Inter',sans-serif;margin-bottom:14px;
   }
   textarea{min-height:70px;resize:vertical;font-family:'Inter',sans-serif;}
-  input:focus, select:focus, textarea:focus{outline:none;border-color:var(--copper);}
+  input:focus, textarea:focus{outline:none;border-color:var(--copper);}
 
   .btn{
     background:var(--copper);color:#0a0b0d;border:none;
@@ -112,11 +101,6 @@
     cursor:pointer;font-family:'IBM Plex Mono',monospace;letter-spacing:0.02em;
   }
   .btn:disabled{opacity:0.4;cursor:not-allowed;}
-  .btn.secondary{background:transparent;border:1px solid var(--line);color:var(--text);}
-  .btn.small{padding:7px 12px;font-size:11px;}
-
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-  @media(max-width:640px){.grid{grid-template-columns:1fr;}}
 
   .company-card{
     background:var(--panel);border:1px solid var(--line);border-radius:10px;
@@ -143,20 +127,11 @@
   .log-row{
     border-top:1px solid var(--line);padding:10px 0;font-size:12px;
   }
-  .log-row .out{color:var(--text);margin-top:4px;font-style:italic;color:var(--muted);}
 
   .empty{
     text-align:center;padding:60px 20px;color:var(--muted);
     border:1px dashed var(--line);border-radius:10px;font-size:13px;
   }
-
-  .swap-card{max-width:420px;margin:0 auto;}
-  .swap-io{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:8px;}
-  .swap-io .row{display:flex;justify-content:space-between;align-items:center;}
-  .swap-io input{background:transparent;border:none;font-size:20px;margin:0;padding:0;font-family:'IBM Plex Mono',monospace;}
-  .swap-io select{width:auto;background:var(--panel);margin:0;}
-  .swap-arrow{text-align:center;color:var(--copper);font-size:18px;margin:2px 0;}
-  .faucet-row{display:flex;gap:8px;margin-top:14px;}
 
   .status-line{font-size:12px;color:var(--muted);margin-top:12px;font-family:'IBM Plex Mono',monospace;}
   .status-line.err{color:var(--bad);}
@@ -175,77 +150,35 @@
       <div class="sub">RITUAL CHAIN · TESTNET 1979</div>
     </div>
   </div>
-  <nav>
-    <button class="tab-btn active" data-view="factory">Factory</button>
-    <button class="tab-btn" data-view="swap">Swap</button>
-  </nav>
   <button class="wallet-btn" id="connectBtn">Connect Wallet</button>
 </header>
 
 <main>
 
-  <!-- ============ FACTORY VIEW ============ -->
-  <section class="view active" id="view-factory">
-    <div class="hero">
-      <div class="eyebrow">Agent-Native Companies</div>
-      <h2>Forge a company that runs itself</h2>
-      <p class="lede">Each company you forge gets its own treasury, wakes itself on a Scheduler loop, and answers paid requests through the Ritual LLM precompile — no server, no keeper, no you.</p>
-    </div>
+  <div class="hero">
+    <div class="eyebrow">Agent-Native Companies</div>
+    <h2>Forge a company that runs itself</h2>
+    <p class="lede">Each company you forge gets its own treasury, wakes itself on a Scheduler loop, and answers paid requests through the Ritual LLM precompile — no server, no keeper, no you.</p>
+  </div>
 
-    <div class="panel">
-      <h3>Deploy a new company</h3>
-      <label>Company type</label>
-      <input id="companyType" placeholder="e.g. Reputation Scorer" />
-      <label>System prompt (defines its job)</label>
-      <textarea id="systemPrompt" placeholder="You are a wallet reputation scorer. Given a wallet address and context, return a score from 0-1000 with brief reasoning."></textarea>
-      <label>Fee per request (RITUAL)</label>
-      <input id="feePerRequest" type="number" step="0.0001" value="0.001" />
-      <label>Initial treasury funding (RITUAL)</label>
-      <input id="initialFunding" type="number" step="0.001" value="0.05" />
-      <button class="btn" id="deployBtn">Forge Company</button>
-      <div class="status-line" id="deployStatus"></div>
-    </div>
+  <div class="panel">
+    <h3>Deploy a new company</h3>
+    <label>Company type</label>
+    <input id="companyType" placeholder="e.g. Reputation Scorer" />
+    <label>System prompt (defines its job)</label>
+    <textarea id="systemPrompt" placeholder="You are a wallet reputation scorer. Given a wallet address and context, return a score from 0-1000 with brief reasoning."></textarea>
+    <label>Fee per request (RITUAL)</label>
+    <input id="feePerRequest" type="number" step="0.0001" value="0.001" />
+    <label>Initial treasury funding (RITUAL)</label>
+    <input id="initialFunding" type="number" step="0.001" value="0.05" />
+    <button class="btn" id="deployBtn">Forge Company</button>
+    <div class="status-line" id="deployStatus"></div>
+  </div>
 
-    <div class="panel">
-      <h3>Live companies (<span id="companyCount">0</span>)</h3>
-      <div id="companyList"></div>
-    </div>
-  </section>
-
-  <!-- ============ SWAP VIEW ============ -->
-  <section class="view" id="view-swap">
-    <div class="hero">
-      <div class="eyebrow">Testnet Demo</div>
-      <h2>Swap RTA / RTB</h2>
-      <p class="lede">Ritual testnet has no deep native liquidity, so this pool runs on two demo tokens you can mint from the faucet below — a real on-chain swap, testnet-scale liquidity.</p>
-    </div>
-
-    <div class="panel swap-card">
-      <div class="swap-io">
-        <label>From</label>
-        <div class="row">
-          <input id="swapAmountIn" type="number" placeholder="0.0" />
-          <select id="tokenIn"><option value="A">RTA</option><option value="B">RTB</option></select>
-        </div>
-      </div>
-      <div class="swap-arrow">↓</div>
-      <div class="swap-io">
-        <label>To (estimated)</label>
-        <div class="row">
-          <input id="swapAmountOut" type="text" placeholder="0.0" disabled />
-          <select id="tokenOut" disabled><option value="B">RTB</option></select>
-        </div>
-      </div>
-      <button class="btn" id="swapBtn" style="width:100%;margin-top:10px;">Approve &amp; Swap</button>
-      <div class="status-line" id="swapStatus"></div>
-
-      <div class="faucet-row">
-        <button class="btn secondary small" id="faucetABtn">Get 1000 RTA</button>
-        <button class="btn secondary small" id="faucetBBtn">Get 1000 RTB</button>
-      </div>
-      <div class="status-line mono" id="poolInfo" style="margin-top:16px;"></div>
-    </div>
-  </section>
+  <div class="panel">
+    <h3>Live companies (<span id="companyCount">0</span>)</h3>
+    <div id="companyList"></div>
+  </div>
 
 </main>
 
@@ -253,10 +186,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
 <script>
-// ============================================================
-// CONFIG — fill these in after running the hardhat ignition deploy
-// (see README.md). The app will not function until these are set.
-// ============================================================
 const CONFIG = {
   chainId: 1979,
   chainIdHex: "0x7BB",
@@ -264,9 +193,6 @@ const CONFIG = {
   chainName: "Ritual Chain Testnet",
   explorer: "https://explorer.ritualfoundation.org",
   factoryAddress: "0xE9619D9F67630B71d125b8d97D38Ca517F5CEb8A",
-  tokenAAddress:  "0xC9e1C6F130E8a345Cd45cc3d698f8361CAFBcE49",
-  tokenBAddress:  "0x8C6155F67033D9d92B1ece5ADF7e10641cC4Ed03",
-  swapAddress:    "0x1d134A1F8c2a3EEdA29992E1Ba21ad57D1f986F1",
 };
 
 const FACTORY_ABI = [
@@ -288,32 +214,7 @@ const COMPANY_ABI = [
   "function getRecentLog() view returns (tuple(address requester,string input,string output,uint256 timestamp)[])"
 ];
 
-const ERC20_ABI = [
-  "function balanceOf(address) view returns (uint256)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)",
-  "function faucet()"
-];
-
-const SWAP_ABI = [
-  "function swap(address tokenIn, uint256 amountIn, uint256 minAmountOut) returns (uint256)",
-  "function quote(address tokenIn, uint256 amountIn) view returns (uint256)",
-  "function getReserves() view returns (uint256, uint256)"
-];
-
 let provider, signer, userAddress;
-
-// ---- nav ----
-document.querySelectorAll(".tab-btn").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById("view-" + btn.dataset.view).classList.add("active");
-    if (btn.dataset.view === "swap") refreshPool();
-    if (btn.dataset.view === "factory") loadCompanies();
-  });
-});
 
 // ---- wallet connect ----
 document.getElementById("connectBtn").addEventListener("click", connectWallet);
@@ -333,7 +234,6 @@ async function connectWallet() {
     btn.textContent = userAddress.slice(0, 6) + "…" + userAddress.slice(-4);
     btn.classList.add("connected");
     loadCompanies();
-    refreshPool();
   } catch (e) {
     console.error(e);
   }
@@ -463,102 +363,12 @@ async function hydrateCompanyCard(card, addr) {
   }
 }
 
-// ---- swap ----
-document.getElementById("tokenIn").addEventListener("change", updateSwapEstimate);
-document.getElementById("swapAmountIn").addEventListener("input", updateSwapEstimate);
-document.getElementById("faucetABtn").addEventListener("click", () => claimFaucet("A"));
-document.getElementById("faucetBBtn").addEventListener("click", () => claimFaucet("B"));
-document.getElementById("swapBtn").addEventListener("click", doSwap);
-
-function tokenAddr(sym) { return sym === "A" ? CONFIG.tokenAAddress : CONFIG.tokenBAddress; }
-
-async function updateSwapEstimate() {
-  const inSym = document.getElementById("tokenIn").value;
-  document.getElementById("tokenOut").innerHTML = inSym === "A" ? "<option>RTB</option>" : "<option>RTA</option>";
-  const amountIn = document.getElementById("swapAmountIn").value;
-  const outEl = document.getElementById("swapAmountOut");
-  if (!amountIn || Number(amountIn) <= 0) { outEl.value = ""; return; }
-  try {
-    if (!provider) provider = new ethers.BrowserProvider(window.ethereum, "any");
-    const swapContract = new ethers.Contract(CONFIG.swapAddress, SWAP_ABI, provider);
-    const out = await swapContract.quote(tokenAddr(inSym), ethers.parseEther(amountIn));
-    outEl.value = Number(ethers.formatEther(out)).toFixed(4);
-  } catch (e) {
-    outEl.value = "–";
-  }
-}
-
-async function claimFaucet(sym) {
-  const statusEl = document.getElementById("swapStatus");
-  if (!signer) { statusEl.textContent = "Connect your wallet first."; statusEl.className = "status-line err"; return; }
-  try {
-    const token = new ethers.Contract(tokenAddr(sym), ERC20_ABI, signer);
-    statusEl.textContent = "Claiming from faucet…";
-    statusEl.className = "status-line";
-    const tx = await token.faucet();
-    await tx.wait();
-    statusEl.textContent = "Claimed 1000 RT" + sym + ".";
-    statusEl.className = "status-line ok";
-  } catch (e) {
-    statusEl.textContent = "Faucet failed: " + (e.shortMessage || e.message || "cooldown active");
-    statusEl.className = "status-line err";
-  }
-}
-
-async function doSwap() {
-  const statusEl = document.getElementById("swapStatus");
-  if (!signer) { statusEl.textContent = "Connect your wallet first."; statusEl.className = "status-line err"; return; }
-  const inSym = document.getElementById("tokenIn").value;
-  const amountIn = document.getElementById("swapAmountIn").value;
-  if (!amountIn || Number(amountIn) <= 0) { statusEl.textContent = "Enter an amount."; statusEl.className = "status-line err"; return; }
-
-  try {
-    const token = new ethers.Contract(tokenAddr(inSym), ERC20_ABI, signer);
-    const swapContract = new ethers.Contract(CONFIG.swapAddress, SWAP_ABI, signer);
-    const amountInWei = ethers.parseEther(amountIn);
-
-    const allowance = await token.allowance(userAddress, CONFIG.swapAddress);
-    if (allowance < amountInWei) {
-      statusEl.textContent = "Approving token spend…";
-      statusEl.className = "status-line";
-      const approveTx = await token.approve(CONFIG.swapAddress, amountInWei);
-      await approveTx.wait();
-    }
-
-    statusEl.textContent = "Swapping…";
-    const quoted = await swapContract.quote(tokenAddr(inSym), amountInWei);
-    const minOut = (quoted * 95n) / 100n; // 5% slippage tolerance
-    const tx = await swapContract.swap(tokenAddr(inSym), amountInWei, minOut);
-    await tx.wait();
-    statusEl.textContent = "Swap complete.";
-    statusEl.className = "status-line ok";
-    refreshPool();
-  } catch (e) {
-    console.error(e);
-    statusEl.textContent = "Swap failed: " + (e.shortMessage || e.message || "unknown error");
-    statusEl.className = "status-line err";
-  }
-}
-
-async function refreshPool() {
-  const infoEl = document.getElementById("poolInfo");
-  try {
-    if (!provider) provider = new ethers.BrowserProvider(window.ethereum, "any");
-    const swapContract = new ethers.Contract(CONFIG.swapAddress, SWAP_ABI, provider);
-    const [rA, rB] = await swapContract.getReserves();
-    infoEl.textContent = `pool reserves — RTA: ${Number(ethers.formatEther(rA)).toFixed(2)} · RTB: ${Number(ethers.formatEther(rB)).toFixed(2)}`;
-  } catch (e) {
-    infoEl.textContent = "pool reserves unavailable — check CONFIG.swapAddress";
-  }
-}
-
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
 }
 
-// initial load attempt (read-only, no wallet required)
 window.addEventListener("load", () => {
   loadCompanies();
 });
