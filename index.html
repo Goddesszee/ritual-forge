@@ -186,6 +186,7 @@
   .btn:hover:not(:disabled){filter:brightness(1.1);}
   .btn:active:not(:disabled){transform:scale(0.98);}
   .btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .small-btn{padding:8px 14px;font-size:11.5px;}
   .spinner{
     width:13px;height:13px;border-radius:50%;
     border:2px solid color-mix(in srgb, var(--on-accent) 30%, transparent);border-top-color:var(--on-accent);
@@ -343,7 +344,9 @@ const COMPANY_ABI = [
   "function lastHeartbeat() view returns (string)",
   "function feePerRequest() view returns (uint256)",
   "function requestService(string input) payable returns (string)",
-  "function getRecentLog() view returns (tuple(address requester,string input,string output,uint256 timestamp)[])"
+  "function getRecentLog() view returns (tuple(address requester,string input,string output,uint256 timestamp)[])",
+  "function start()",
+  "function owner() view returns (address)"
 ];
 
 let provider, signer, userAddress;
@@ -570,7 +573,7 @@ async function loadCompanies() {
             <div class="card-title">${escapeHtml(info.companyType)}</div>
             <div class="card-addr">${info.addr}</div>
           </div>
-          <div class="live-dot" title="running"></div>
+          <div class="live-dot" data-field="dot" title="checking status"></div>
         </div>
         <div class="gauges">
           <div class="gauge"><div class="val" data-field="wakes">–</div><div class="lbl">Wake cycles</div></div>
@@ -578,6 +581,7 @@ async function loadCompanies() {
           <div class="gauge"><div class="val" data-field="treasury">–</div><div class="lbl">Treasury (RITUAL)</div></div>
         </div>
         <div class="log-row" data-field="heartbeat"></div>
+        <div data-field="startArea"></div>
       `;
       grid.appendChild(card);
       hydrateCompanyCard(card, info.addr);
@@ -591,15 +595,60 @@ async function loadCompanies() {
 async function hydrateCompanyCard(card, addr) {
   try {
     const company = new ethers.Contract(addr, COMPANY_ABI, provider);
-    const [wakes, requests, treasury, heartbeat] = await Promise.all([
-      company.wakeCount(), company.requestCount(), company.treasuryBalance(), company.lastHeartbeat().catch(() => "")
+    const [wakes, requests, treasury, heartbeat, running, ownerAddr] = await Promise.all([
+      company.wakeCount(), company.requestCount(), company.treasuryBalance(),
+      company.lastHeartbeat().catch(() => ""), company.running(), company.owner()
     ]);
     card.querySelector('[data-field="wakes"]').textContent = wakes.toString();
     card.querySelector('[data-field="requests"]').textContent = requests.toString();
     card.querySelector('[data-field="treasury"]').textContent = Number(ethers.formatEther(treasury)).toFixed(4);
-    card.querySelector('[data-field="heartbeat"]').textContent = heartbeat ? '"' + heartbeat + '"' : "awaiting first heartbeat.";
+    card.querySelector('[data-field="heartbeat"]').textContent = heartbeat ? '"' + heartbeat + '"' : "no heartbeat yet.";
+
+    const dot = card.querySelector('[data-field="dot"]');
+    const startArea = card.querySelector('[data-field="startArea"]');
+
+    if (running) {
+      dot.style.background = "var(--good)";
+      dot.title = "running, self-scheduled";
+    } else {
+      dot.style.background = "var(--bad)";
+      dot.style.animation = "none";
+      dot.title = "not started yet";
+      const isOwner = userAddress && ownerAddr.toLowerCase() === userAddress.toLowerCase();
+      startArea.innerHTML = `
+        <div style="border-top:1px solid var(--line);padding-top:12px;margin-top:2px;">
+          <button class="btn small-btn" data-start="${addr}" ${isOwner ? "" : "disabled"}>Start company</button>
+          <div class="status-line" data-field="startStatus">${isOwner ? "Not scheduled yet. Registers the first Scheduler wake-up." : "Only the owner can start this company."}</div>
+        </div>
+      `;
+      const startBtn = startArea.querySelector("button");
+      startBtn.addEventListener("click", () => startCompany(addr, card));
+    }
   } catch (e) {
     console.error("hydrate failed for", addr, e);
+  }
+}
+
+async function startCompany(addr, card) {
+  const statusEl = card.querySelector('[data-field="startStatus"]');
+  const btn = card.querySelector(`[data-start="${addr}"]`);
+  if (!signer) { statusEl.textContent = "Connect your wallet first."; statusEl.className = "status-line err"; return; }
+  try {
+    btn.disabled = true;
+    statusEl.textContent = "Confirm in your wallet.";
+    statusEl.className = "status-line";
+    const company = new ethers.Contract(addr, COMPANY_ABI, signer);
+    const tx = await company.start();
+    statusEl.textContent = "Registering Scheduler wake-up.";
+    await tx.wait();
+    statusEl.textContent = "Started. Will wake in roughly 500 blocks.";
+    statusEl.className = "status-line ok";
+    hydrateCompanyCard(card, addr);
+  } catch (e) {
+    console.error(e);
+    btn.disabled = false;
+    statusEl.textContent = "Start failed: " + (e.shortMessage || e.message || "unknown error");
+    statusEl.className = "status-line err";
   }
 }
 

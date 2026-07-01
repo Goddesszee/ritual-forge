@@ -59,8 +59,6 @@ contract CompanyFactory {
         }));
         companiesByOwner[msg.sender].push(companies.length - 1);
 
-        company.start();
-
         emit CompanyDeployed(companyAddress, msg.sender, companyType, feePerRequest, msg.value);
     }
 
