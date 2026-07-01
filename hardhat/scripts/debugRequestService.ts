@@ -71,7 +71,16 @@ async function main() {
       console.log("\n=== LLM RESPONSE ===");
       console.log(logs.length > 0 ? logs[0].args.output : "(no ServiceDelivered event found in this block)");
     } else {
-      console.log("Transaction reverted on-chain.");
+      console.log("Transaction reverted on-chain. Trying debug_traceTransaction for the real execution trace...");
+      try {
+        const trace: any = await publicClient.request({
+          method: "debug_traceTransaction" as any,
+          params: [txHash, { tracer: "callTracer" }] as any,
+        });
+        console.log(JSON.stringify(trace, null, 2).slice(0, 3000));
+      } catch (traceErr: any) {
+        console.log("debug_traceTransaction not available:", traceErr.shortMessage || traceErr.message);
+      }
     }
   } catch (err: any) {
     console.log("FAILED:", err.shortMessage || err.message);
