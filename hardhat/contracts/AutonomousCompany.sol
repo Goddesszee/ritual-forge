@@ -126,7 +126,23 @@ contract AutonomousCompany {
         if (msg.sender != owner && msg.sender != factory) revert OnlyOwner();
         if (running) revert AlreadyRunning();
         running = true;
+        _fundWallet();
+        scheduleId = _scheduleWakeup(WAKE_INTERVAL);
+        emit CompanyStarted(block.number);
+    }
 
+    /// @notice Step 1 only, callable independently for isolated testing.
+    function fundWalletOnly() external onlyOwner {
+        _fundWallet();
+    }
+
+    /// @notice Step 2 only, callable independently for isolated testing.
+    /// Does not set `running` or check AlreadyRunning, pure isolation probe.
+    function scheduleOnly() external onlyOwner returns (uint256) {
+        return _scheduleWakeup(WAKE_INTERVAL);
+    }
+
+    function _fundWallet() internal {
         // Ritual's Scheduler pulls execution fees from RitualWallet, not from
         // this contract's plain balance. Fund it before the first schedule call.
         uint256 depositAmount = SCHEDULER_FEE_DEPOSIT;
@@ -143,9 +159,6 @@ contract AutonomousCompany {
                 }
             }
         }
-
-        scheduleId = _scheduleWakeup(WAKE_INTERVAL);
-        emit CompanyStarted(block.number);
     }
 
     function wakeUp(uint256) external {
