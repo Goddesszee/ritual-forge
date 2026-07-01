@@ -179,12 +179,17 @@ contract AutonomousCompany {
 
         wakeCount++;
         lastWakeBlock = block.number;
-        (, string memory content, string memory errMsg) = _callLLM(
+        try this._callLLM(
             systemPrompt,
             "Routine heartbeat check. In under 15 words, state your operating status and readiness for new requests.",
             256
-        );
-        lastHeartbeat = bytes(content).length > 0 ? content : errMsg;
+        ) returns (bool, string memory content, string memory errMsg) {
+            lastHeartbeat = bytes(content).length > 0 ? content : errMsg;
+        } catch Error(string memory reason) {
+            lastHeartbeat = string(abi.encodePacked("llm call reverted: ", reason));
+        } catch (bytes memory) {
+            lastHeartbeat = "llm call reverted (no reason)";
+        }
 
         scheduleId = _scheduleWakeup(WAKE_INTERVAL);
         emit WokeUp(wakeCount, block.number, lastHeartbeat);
@@ -236,9 +241,10 @@ contract AutonomousCompany {
     }
 
     function _callLLM(string memory sysPrompt, string memory userContent, uint256 maxTokens)
-        internal
+        external
         returns (bool hasError, string memory content, string memory errorMessage)
     {
+        if (msg.sender != address(this)) revert OnlyOwner();
         address executor = _getExecutor();
 
         string memory messagesJson = string(
@@ -346,8 +352,13 @@ contract AutonomousCompany {
         totalRevenue += msg.value;
         requestCount++;
 
-        (, string memory content, string memory errMsg) = _callLLM(systemPrompt, input, 4096);
-        output = bytes(content).length > 0 ? content : errMsg;
+        try this._callLLM(systemPrompt, input, 4096) returns (bool, string memory content, string memory errMsg) {
+            output = bytes(content).length > 0 ? content : errMsg;
+        } catch Error(string memory reason) {
+            output = string(abi.encodePacked("llm call reverted: ", reason));
+        } catch (bytes memory) {
+            output = "llm call reverted (no reason available)";
+        }
 
         _pushLog(msg.sender, input, output);
         emit ServiceDelivered(msg.sender, msg.value, output);
