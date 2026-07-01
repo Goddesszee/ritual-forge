@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Forge — Ritual Chain</title>
+<title>Forge: Ritual Chain</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{
+  :root, [data-theme="dark"]{
     --bg:#0a0b0d;
     --panel:#14161a;
     --panel-2:#1b1e24;
@@ -19,6 +19,18 @@
     --good:#4ade80;
     --bad:#f87171;
   }
+  [data-theme="light"]{
+    --bg:#f7f5f1;
+    --panel:#ffffff;
+    --panel-2:#f0ede7;
+    --line:#ddd8cf;
+    --text:#201d19;
+    --muted:#6b665f;
+    --copper:#a85f24;
+    --copper-dim:#8a5228;
+    --good:#1f9d55;
+    --bad:#c8382c;
+  }
   *{box-sizing:border-box;}
   body{
     margin:0;
@@ -26,6 +38,7 @@
     color:var(--text);
     font-family:'Inter',sans-serif;
     min-height:100vh;
+    transition:background 0.2s ease, color 0.2s ease;
   }
   .mono{font-family:'IBM Plex Mono',monospace;}
 
@@ -37,10 +50,12 @@
     justify-content:space-between;
     position:sticky;
     top:0;
-    background:rgba(10,11,13,0.92);
+    background:var(--bg);
+    background:color-mix(in srgb, var(--bg) 92%, transparent);
     backdrop-filter:blur(8px);
     z-index:10;
   }
+  .header-right{display:flex;align-items:center;gap:10px;}
   .brand{display:flex;align-items:center;gap:10px;}
   .brand .mark{
     width:28px;height:28px;
@@ -55,6 +70,12 @@
   .brand .mark span{transform:rotate(-45deg);}
   .brand h1{font-size:16px;font-weight:600;margin:0;letter-spacing:0.02em;}
   .brand .sub{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:0.05em;}
+
+  .theme-btn{
+    background:var(--panel);border:1px solid var(--line);color:var(--text);
+    width:36px;height:36px;border-radius:6px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:15px;
+  }
 
   .wallet-btn{
     background:var(--copper-dim);
@@ -150,7 +171,10 @@
       <div class="sub">RITUAL CHAIN · TESTNET 1979</div>
     </div>
   </div>
-  <button class="wallet-btn" id="connectBtn">Connect Wallet</button>
+  <div class="header-right">
+    <button class="theme-btn" id="themeBtn" title="Toggle light and dark mode">🌙</button>
+    <button class="wallet-btn" id="connectBtn">Connect Wallet</button>
+  </div>
 </header>
 
 <main>
@@ -158,7 +182,7 @@
   <div class="hero">
     <div class="eyebrow">Agent-Native Companies</div>
     <h2>Forge a company that runs itself</h2>
-    <p class="lede">Each company you forge gets its own treasury, wakes itself on a Scheduler loop, and answers paid requests through the Ritual LLM precompile — no server, no keeper, no you.</p>
+    <p class="lede">Each company you forge gets its own treasury. It wakes itself up on a Scheduler loop and answers paid requests through the Ritual LLM precompile. No server, no keeper, no you.</p>
   </div>
 
   <div class="panel">
@@ -182,7 +206,7 @@
 
 </main>
 
-<footer>forge · deployed contracts on Ritual Chain testnet (1979) · testnet tokens have no value</footer>
+<footer>forge: deployed contracts on Ritual Chain testnet (1979). testnet tokens have no value.</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.4/ethers.umd.min.js"></script>
 <script>
@@ -215,6 +239,30 @@ const COMPANY_ABI = [
 ];
 
 let provider, signer, userAddress;
+
+// ---- theme toggle ----
+const themeBtn = document.getElementById("themeBtn");
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  themeBtn.textContent = theme === "dark" ? "🌙" : "☀️";
+  localStorage.setItem("forge-theme", theme);
+}
+
+(function initTheme() {
+  const saved = localStorage.getItem("forge-theme");
+  if (saved) {
+    applyTheme(saved);
+  } else {
+    const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
+    applyTheme(prefersLight ? "light" : "dark");
+  }
+})();
+
+themeBtn.addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme");
+  applyTheme(current === "dark" ? "light" : "dark");
+});
 
 // ---- wallet connect ----
 document.getElementById("connectBtn").addEventListener("click", connectWallet);
@@ -280,7 +328,7 @@ async function deployCompany() {
   }
 
   try {
-    statusEl.textContent = "Confirm the transaction in your wallet…";
+    statusEl.textContent = "Confirm the transaction in your wallet.";
     statusEl.className = "status-line";
     const factory = new ethers.Contract(CONFIG.factoryAddress, FACTORY_ABI, signer);
     const tx = await factory.deployCompany(
@@ -289,7 +337,7 @@ async function deployCompany() {
       ethers.parseEther(feePerRequest || "0"),
       { value: ethers.parseEther(initialFunding || "0") }
     );
-    statusEl.textContent = "Deploying — waiting for confirmation…";
+    statusEl.textContent = "Deploying. Waiting for confirmation.";
     await tx.wait();
     statusEl.textContent = "Company deployed and running.";
     statusEl.className = "status-line ok";
@@ -344,7 +392,7 @@ async function loadCompanies() {
     }
   } catch (e) {
     console.error(e);
-    listEl.innerHTML = '<div class="empty">Could not load companies. Check that CONFIG.factoryAddress is set and you\'re on Ritual testnet.</div>';
+    listEl.innerHTML = '<div class="empty">Could not load companies. Check that CONFIG.factoryAddress is set and you are on Ritual testnet.</div>';
   }
 }
 
@@ -357,7 +405,7 @@ async function hydrateCompanyCard(card, addr) {
     card.querySelector('[data-field="wakes"]').textContent = wakes.toString();
     card.querySelector('[data-field="requests"]').textContent = requests.toString();
     card.querySelector('[data-field="treasury"]').textContent = Number(ethers.formatEther(treasury)).toFixed(4);
-    card.querySelector('[data-field="heartbeat"]').textContent = heartbeat ? '"' + heartbeat + '"' : "awaiting first heartbeat…";
+    card.querySelector('[data-field="heartbeat"]').textContent = heartbeat ? '"' + heartbeat + '"' : "awaiting first heartbeat.";
   } catch (e) {
     console.error("hydrate failed for", addr, e);
   }

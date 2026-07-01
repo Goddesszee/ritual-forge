@@ -1,29 +1,39 @@
 # Forge
 
-A factory contract that spins up autonomous, self-funding, self-scheduling
-"companies" on Ritual Chain — plus a minimal on-chain swap for two demo
-tokens (RTA / RTB), since Ritual testnet has no deep native liquidity yet.
+Forge is a factory contract on Ritual Chain that deploys autonomous, self-running "companies." Each one gets its own treasury, wakes itself on a Scheduler loop, and does a job you define using the Ritual LLM precompile. Once it's live, nobody has to keep it running. It funds itself, re-schedules its own next wake-up every cycle, and answers paid requests on its own.
 
 ## What's in here
 
 ```
 hardhat/contracts/
-  CompanyFactory.sol      — deploys new AutonomousCompany instances
-  AutonomousCompany.sol   — self-waking (Scheduler), LLM-precompile-driven company
-  TestToken.sol           — minimal ERC20 with public faucet (RTA / RTB)
-  SimpleSwap.sol           — constant-product AMM pool for RTA/RTB
-hardhat/ignition/modules/Deploy.ts   — deploys factory + both tokens + swap pool
-index.html               — the whole frontend (no build step)
-vercel.json               — static hosting config
+  CompanyFactory.sol      deploys new AutonomousCompany instances
+  AutonomousCompany.sol   self-waking company, driven by the LLM precompile
+  TestToken.sol           demo ERC20 with public faucet (not used by the live UI)
+  SimpleSwap.sol          demo AMM pool (not used by the live UI)
+hardhat/ignition/modules/Deploy.ts   deploys the factory plus the demo tokens and pool
+index.html               the whole frontend, no build step
+vercel.json               static hosting config
 ```
 
-Contracts compile clean against solc 0.8.24 (verified locally). They were
-not broadcast to Ritual testnet from this environment — I don't have
-network access to `rpc.ritualfoundation.org` from my sandbox, and I never
-handle your private key directly. You'll run the actual deploy yourself,
-one time, with your own funded wallet.
+The live app only uses `CompanyFactory` and `AutonomousCompany`. The token and swap contracts were part of an earlier version of the app and are no longer wired into the UI. They're harmless to leave deployed, and can be removed from the repo later if you want a smaller footprint.
 
-## Step 1 — Deploy the contracts
+## Live contract
+
+CompanyFactory is deployed on Ritual testnet at:
+
+```
+0xE9619D9F67630B71d125b8d97D38Ca517F5CEb8A
+```
+
+## How a company works, start to finish
+
+1. Someone calls `CompanyFactory.deployCompany(companyType, systemPrompt, feePerRequest)` with some RITUAL as `msg.value`. That becomes the new company's starting treasury.
+2. The factory deploys a fresh `AutonomousCompany` and calls `start()` on it, which registers the first Scheduler wake-up 500 blocks out.
+3. On every wake-up, the company calls the LLM precompile (`0x0802`) for a heartbeat status check, logs it, and re-schedules its own next wake-up. Nobody needs to call it again.
+4. Anyone can call `requestService(input)` on a company and pay `feePerRequest`. The company runs `input` through the LLM precompile using its own `systemPrompt` as the system message, and the fee adds to its treasury.
+5. The company owner can `withdraw()` accumulated treasury at any time.
+
+## Redeploying the contracts yourself
 
 ```bash
 cd hardhat
@@ -42,63 +52,9 @@ Then deploy:
 npx hardhat ignition deploy ignition/modules/Deploy.ts --network ritual
 ```
 
-This deploys, in order: `CompanyFactory`, `TokenA` (RTA), `TokenB` (RTB),
-`SimpleSwap`. Copy the four resulting addresses.
-
-## Step 2 — Seed the swap pool (optional but needed for swap to work)
-
-From the deployer wallet, mint yourself tokens via each token's `faucet()`
-function (1000 per call, 1hr cooldown), then call `SimpleSwap.addLiquidity()`
-with matched amounts of RTA and RTB — you'll need to `approve()` the swap
-contract for both tokens first. This can be done via Remix, a small script,
-or directly from the deployed frontend once it's live (add an "add liquidity"
-call via console, or I can add a liquidity UI in a follow-up pass).
-
-## Step 3 — Wire up the frontend
-
-Open `index.html` and fill in the four addresses at the top of the
-`<script>` block:
-
-```js
-const CONFIG = {
-  ...
-  factoryAddress: "0xYourFactoryAddress",
-  tokenAAddress:  "0xYourTokenAAddress",
-  tokenBAddress:  "0xYourTokenBAddress",
-  swapAddress:    "0xYourSwapAddress",
-};
-```
-
-## Step 4 — Deploy to Vercel
-
-Push this repo to GitHub, then import it into Vercel as a static site
-(Framework preset: **Other**). No build command needed — `index.html` is
-served as-is, same pattern as your `ritual-chain-workshop` deploy.
-
-## How a company works, end to end
-
-1. Someone calls `CompanyFactory.deployCompany(companyType, systemPrompt, feePerRequest)`
-   with some RITUAL as `msg.value` — that becomes the new company's starting treasury.
-2. The factory deploys a fresh `AutonomousCompany` and calls `start()` on it,
-   which registers the first Scheduler wake-up 500 blocks out.
-3. Every wake-up, the company calls the LLM precompile (`0x0802`) for a
-   heartbeat status check, logs it, and re-schedules its own next wake-up —
-   nobody needs to call it again.
-4. Anyone can call `requestService(input)` on a company and pay `feePerRequest`;
-   the company runs `input` through the LLM precompile using its own
-   `systemPrompt` as the system message, and the fee adds to its treasury.
-5. The company owner can `withdraw()` accumulated treasury at any time.
+Copy the resulting `CompanyFactory` address into `CONFIG.factoryAddress` at the top of `index.html`, then push and redeploy on Vercel.
 
 ## Known limitations, stated plainly
 
-- **Swap liquidity is testnet-scale**, seeded by whoever adds liquidity first.
-  This is a real on-chain AMM, not a mock — but don't expect deep liquidity
-  or tight pricing.
-- **No CCTP bridge.** Ritual Chain is not a Circle CCTP-supported domain as
-  of this build, so there's no way to bridge USDC or any Circle asset
-  directly into Ritual. If you want cross-chain funding later, the realistic
-  path is CCTP into Arc (already supported, already used by NAN) plus a
-  custom relayer contract into a company's treasury — a separate build.
-- **Company `systemPrompt` is public** on-chain (anyone can read it). If a
-  company type needs a private "secret sauce" prompt, that would need the
-  DKMS/ECIES precompile pattern instead — not implemented here yet.
+- The company's `systemPrompt` is public on chain. Anyone can read it. If a company type needs a private "secret sauce" prompt, that would need the DKMS/ECIES precompile pattern instead, which isn't implemented here yet.
+- No swap or bridge feature. An earlier version explored a demo swap and a real-RITUAL-to-USDC pairing, but Ritual Chain has no USDC deployed anywhere (native or bridged) as of this build, so that idea was dropped in favor of keeping Forge focused on its one job: deploying autonomous companies.
