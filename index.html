@@ -77,16 +77,16 @@
   }
   .header-right{display:flex;align-items:center;gap:12px;}
   .ritual-badge{
-    display:inline-flex;align-items:center;gap:6px;
+    display:inline-flex;align-items:center;
     color:var(--muted);
     font-family:'IBM Plex Mono',monospace;
     font-size:11.5px;letter-spacing:0.04em;
-    padding:6px 10px;border-radius:8px;
+    padding:8px 12px;border-radius:8px;
     border:1px solid var(--line);background:var(--panel);
+    white-space:nowrap;
   }
-  .ritual-badge svg{color:var(--accent);flex-shrink:0;}
   @media (max-width:560px){
-    .ritual-badge span:last-child{display:none;}
+    .ritual-badge{display:none;}
   }
   .brand{display:flex;align-items:center;gap:9px;}
   .brand .mark{
@@ -267,16 +267,8 @@
     </div>
   </div>
   <div class="header-right">
-    <span class="ritual-badge" title="Built on Ritual Chain, testnet 1979">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-        <circle cx="12" cy="5" r="2.2"/>
-        <circle cx="5" cy="18" r="2.2"/>
-        <circle cx="19" cy="18" r="2.2"/>
-        <line x1="12" y1="7.2" x2="5" y2="15.8"/>
-        <line x1="12" y1="7.2" x2="19" y2="15.8"/>
-        <line x1="7.2" y1="18" x2="16.8" y2="18"/>
-      </svg>
-      <span>Ritual</span>
+    <span class="ritual-badge" title="Ritual Chain testnet 1979">
+      <span>Ritual testnet</span>
     </span>
     <button class="theme-btn" id="themeBtn" title="Toggle light and dark mode" aria-label="Toggle theme">🌙</button>
     <button class="wallet-btn" id="connectBtn">Connect wallet</button>
