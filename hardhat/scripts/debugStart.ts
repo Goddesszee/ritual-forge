@@ -1,50 +1,48 @@
 import { network } from "hardhat";
+import { encodeFunctionData } from "viem";
 
-const COMPANY_ADDRESS = "0xA9BD7E178D05961d5b7194dE353dEbc43905244D";
+const COMPANY_ADDRESS = "0xcA587628c3730C95B9810DdF013Fb0131aE3e711";
 
 async function main() {
   const { viem } = await network.connect();
   const publicClient = await viem.getPublicClient();
   const [walletClient] = await viem.getWalletClients();
 
-  console.log("Simulating start() on company:", COMPANY_ADDRESS);
+  console.log("Raw eth_call simulation of start() on:", COMPANY_ADDRESS);
   console.log("From:", walletClient.account.address);
 
+  const startAbi = [
+    { type: "function", name: "start", stateMutability: "nonpayable", inputs: [], outputs: [] },
+  ] as const;
+
+  const data = encodeFunctionData({ abi: startAbi, functionName: "start" });
+
   try {
-    const { request } = await publicClient.simulateContract({
-      address: COMPANY_ADDRESS as `0x${string}`,
-      abi: [
-        {
-          type: "function",
-          name: "start",
-          stateMutability: "nonpayable",
-          inputs: [],
-          outputs: [],
-        },
-        { type: "error", name: "OnlyOwner", inputs: [] },
-        { type: "error", name: "OnlyScheduler", inputs: [] },
-        { type: "error", name: "OnlyFactory", inputs: [] },
-        { type: "error", name: "AlreadyRunning", inputs: [] },
-        { type: "error", name: "InsufficientFee", inputs: [] },
-        { type: "error", name: "DepositFailed", inputs: [] },
-        { type: "error", name: "ScheduleFailed", inputs: [] },
-      ],
-      functionName: "start",
+    const result = await publicClient.call({
       account: walletClient.account,
+      to: COMPANY_ADDRESS as `0x${string}`,
+      data,
     });
-    console.log("Simulation SUCCEEDED:", request);
+    console.log("SUCCEEDED, return data:", result);
   } catch (err: any) {
-    console.log("\n=== SIMULATION FAILED ===");
-    console.log("Short message:", err.shortMessage || err.message);
-    if (err.cause) {
-      console.log("Cause name:", err.cause.name);
-      console.log("Cause short message:", err.cause.shortMessage || err.cause.message);
-      if (err.cause.data) console.log("Revert data:", err.cause.data);
-      if (err.cause.reason) console.log("Decoded reason:", err.cause.reason);
-      if (err.cause.cause) {
-        console.log("Nested cause:", err.cause.cause.shortMessage || err.cause.cause.message);
-        if (err.cause.cause.errorName) console.log(">>> DECODED ERROR NAME:", err.cause.cause.errorName);
-      }
+    console.log("\n=== RAW CALL FAILED ===");
+    console.log("Full error object keys:", Object.keys(err));
+    console.log("err.details:", err.details);
+    console.log("err.shortMessage:", err.shortMessage);
+    console.log("err.metaMessages:", err.metaMessages);
+
+    // Walk the cause chain and print every layer's data field
+    let current = err;
+    let depth = 0;
+    while (current && depth < 6) {
+      console.log(`\n--- depth ${depth} ---`);
+      console.log("name:", current.name);
+      console.log("message:", (current.message || "").slice(0, 300));
+      if (current.data) console.log("RAW DATA:", current.data);
+      if (current.signature) console.log("signature:", current.signature);
+      if (current.errorName) console.log("errorName:", current.errorName);
+      current = current.cause;
+      depth++;
     }
   }
 }
