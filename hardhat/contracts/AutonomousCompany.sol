@@ -42,7 +42,8 @@ interface IScheduler {
         uint256 maxFeePerGas,
         uint256 maxPriorityFeePerGas,
         uint256 value,
-        address payer
+        address payer,
+        address predicate
     ) external returns (uint256 callId);
     function cancel(uint256 callId) external;
 }
@@ -206,7 +207,8 @@ contract AutonomousCompany {
                 block.basefee + 1 gwei,
                 uint256(0),
                 uint256(0),
-                address(this)
+                address(this),
+                address(0)
             )
         );
         if (!ok) {
