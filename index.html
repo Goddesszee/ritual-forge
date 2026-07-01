@@ -1,43 +1,45 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Forge: Ritual Chain</title>
 <meta name="description" content="Deploy autonomous, self-funding companies on Ritual Chain. No server, no keeper, no you." />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='20' y='20' width='60' height='60' fill='none' stroke='%23c9793b' stroke-width='10' transform='rotate(45 50 50)'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='20' y='20' width='60' height='60' fill='none' stroke='%231f4d3d' stroke-width='10' transform='rotate(45 50 50)'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,600;1,500;1,600&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root, [data-theme="dark"]{
-    --bg:#0a0b0d;
-    --panel:#14161a;
-    --panel-2:#1b1e24;
-    --line:#262a31;
-    --text:#e8e6e1;
-    --muted:#8b8d93;
-    --copper:#c9793b;
-    --copper-dim:#8a5228;
+  :root, [data-theme="light"]{
+    --bg:#f4f1ea;
+    --panel:#faf8f3;
+    --panel-2:#ece7db;
+    --line:#ddd6c6;
+    --text:#1c1a16;
+    --muted:#6b665b;
+    --accent:#1f4d3d;
+    --accent-dim:#163a2e;
+    --on-accent:#f4f1ea;
+    --good:#2f8f5b;
+    --bad:#b8402f;
+    --shadow:0 1px 2px rgba(28,26,22,0.05), 0 8px 24px rgba(28,26,22,0.06);
+    --shadow-sm:0 1px 3px rgba(28,26,22,0.05);
+    --grid-line:rgba(31,77,61,0.05);
+  }
+  [data-theme="dark"]{
+    --bg:#0d1210;
+    --panel:#151b18;
+    --panel-2:#1b2320;
+    --line:#2a352f;
+    --text:#ece7dc;
+    --muted:#8b9189;
+    --accent:#4bbf8a;
+    --accent-dim:#337a5a;
+    --on-accent:#0d1210;
     --good:#4ade80;
     --bad:#f87171;
-    --shadow:0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.28);
+    --shadow:0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
     --shadow-sm:0 1px 3px rgba(0,0,0,0.35);
-    --grid-line:rgba(201,121,59,0.05);
-  }
-  [data-theme="light"]{
-    --bg:#f7f5f1;
-    --panel:#ffffff;
-    --panel-2:#f0ede7;
-    --line:#ddd8cf;
-    --text:#201d19;
-    --muted:#6b665f;
-    --copper:#a85f24;
-    --copper-dim:#8a5228;
-    --good:#1f9d55;
-    --bad:#c8382c;
-    --shadow:0 1px 2px rgba(32,29,25,0.06), 0 8px 24px rgba(32,29,25,0.08);
-    --shadow-sm:0 1px 3px rgba(32,29,25,0.06);
-    --grid-line:rgba(168,95,36,0.05);
+    --grid-line:rgba(75,191,138,0.06);
   }
   *{box-sizing:border-box;}
   html{scroll-behavior:smooth;}
@@ -55,6 +57,7 @@
     -webkit-font-smoothing:antialiased;
   }
   .mono{font-family:'IBM Plex Mono',monospace;}
+  .serif-italic{font-family:'Newsreader',serif;font-style:italic;font-weight:500;}
 
   header{
     border-bottom:1px solid var(--line);
@@ -72,19 +75,19 @@
   .brand{display:flex;align-items:center;gap:11px;}
   .brand .mark{
     width:30px;height:30px;
-    border:2px solid var(--copper);
+    border:2px solid var(--accent);
     display:flex;align-items:center;justify-content:center;
     font-family:'IBM Plex Mono',monospace;
     font-weight:700;
     font-size:13px;
-    color:var(--copper);
+    color:var(--accent);
     transform:rotate(45deg);
     flex-shrink:0;
-    box-shadow:0 0 0 1px color-mix(in srgb, var(--copper) 20%, transparent);
+    box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
   }
   .brand .mark span{transform:rotate(-45deg);}
   .brand-text{display:flex;flex-direction:column;gap:1px;}
-  .brand h1{font-size:16px;font-weight:600;margin:0;letter-spacing:0.01em;line-height:1.2;}
+  .brand h1{font-size:17px;font-weight:600;margin:0;letter-spacing:0.01em;line-height:1.2;font-family:'Newsreader',serif;}
   .brand .sub{font-size:10.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:0.06em;}
 
   .theme-btn{
@@ -93,24 +96,24 @@
     display:flex;align-items:center;justify-content:center;font-size:15px;
     transition:border-color 0.15s ease, transform 0.1s ease;
   }
-  .theme-btn:hover{border-color:var(--copper);}
+  .theme-btn:hover{border-color:var(--accent);}
   .theme-btn:active{transform:scale(0.94);}
 
   .wallet-btn{
-    background:var(--copper);
-    color:#0a0b0d;border:none;
+    background:var(--accent);
+    color:var(--on-accent);border:none;
     padding:9px 18px;border-radius:8px;
     font-size:12.5px;font-weight:700;cursor:pointer;
     font-family:'IBM Plex Mono',monospace;letter-spacing:0.01em;
     transition:filter 0.15s ease, transform 0.1s ease;
   }
-  .wallet-btn:hover{filter:brightness(1.08);}
+  .wallet-btn:hover{filter:brightness(1.1);}
   .wallet-btn:active{transform:scale(0.97);}
   .wallet-btn.connected{background:var(--panel-2);border:1px solid var(--good);color:var(--good);}
 
-  main{max-width:920px;margin:0 auto;padding:48px 24px 80px;}
+  main{max-width:920px;margin:0 auto;padding:56px 24px 80px;}
 
-  .badge-row{display:flex;align-items:center;gap:8px;margin-bottom:22px;}
+  .badge-row{display:flex;align-items:center;gap:8px;margin-bottom:26px;}
   .chain-badge{
     display:inline-flex;align-items:center;gap:6px;
     background:var(--panel);border:1px solid var(--line);
@@ -120,16 +123,21 @@
   }
   .chain-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--good);flex-shrink:0;}
 
-  .hero{margin-bottom:36px;}
+  .hero{margin-bottom:40px;}
   .eyebrow{
     font-family:'IBM Plex Mono',monospace;
-    font-size:11px;color:var(--copper);
+    font-size:11px;color:var(--accent);
     letter-spacing:0.14em;text-transform:uppercase;
-    margin-bottom:10px;
+    margin-bottom:12px;
     font-weight:600;
   }
-  h2{font-size:30px;margin:0 0 12px;font-weight:700;letter-spacing:-0.01em;line-height:1.2;}
-  .lede{color:var(--muted);font-size:15px;line-height:1.65;max-width:580px;}
+  h2{
+    font-family:'Newsreader',serif;
+    font-size:40px;margin:0 0 16px;font-weight:400;letter-spacing:-0.01em;line-height:1.15;
+    max-width:640px;
+  }
+  h2 em{font-style:italic;color:var(--accent);font-weight:500;}
+  .lede{color:var(--muted);font-size:15.5px;line-height:1.7;max-width:580px;}
 
   .panel{
     background:var(--panel);
@@ -139,9 +147,9 @@
     margin-bottom:20px;
     box-shadow:var(--shadow-sm);
   }
-  .panel h3{margin:0 0 18px;font-size:14px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;}
+  .panel h3{margin:0 0 18px;font-size:15px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;font-family:'Newsreader',serif;}
   .panel h3 .count-pill{
-    background:var(--panel-2);color:var(--copper);font-family:'IBM Plex Mono',monospace;
+    background:var(--panel-2);color:var(--accent);font-family:'IBM Plex Mono',monospace;
     font-size:11px;padding:2px 8px;border-radius:100px;font-weight:600;
   }
 
@@ -154,24 +162,24 @@
   }
   textarea{min-height:76px;resize:vertical;font-family:'Inter',sans-serif;}
   input:focus, textarea:focus{
-    outline:none;border-color:var(--copper);
-    box-shadow:0 0 0 3px color-mix(in srgb, var(--copper) 15%, transparent);
+    outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
   }
   input::placeholder, textarea::placeholder{color:var(--muted);opacity:0.7;}
 
   .btn{
-    background:var(--copper);color:#0a0b0d;border:none;
+    background:var(--accent);color:var(--on-accent);border:none;
     padding:12px 22px;border-radius:8px;font-size:13px;font-weight:700;
     cursor:pointer;font-family:'IBM Plex Mono',monospace;letter-spacing:0.02em;
     display:inline-flex;align-items:center;justify-content:center;gap:8px;
     transition:filter 0.15s ease, transform 0.1s ease;
   }
-  .btn:hover:not(:disabled){filter:brightness(1.08);}
+  .btn:hover:not(:disabled){filter:brightness(1.1);}
   .btn:active:not(:disabled){transform:scale(0.98);}
   .btn:disabled{opacity:0.5;cursor:not-allowed;}
   .spinner{
     width:13px;height:13px;border-radius:50%;
-    border:2px solid rgba(10,11,13,0.25);border-top-color:#0a0b0d;
+    border:2px solid color-mix(in srgb, var(--on-accent) 30%, transparent);border-top-color:var(--on-accent);
     animation:spin 0.7s linear infinite;display:none;
   }
   .btn.loading .spinner{display:inline-block;}
@@ -182,12 +190,12 @@
     padding:20px;position:relative;overflow:hidden;
     transition:border-color 0.15s ease, transform 0.15s ease;
   }
-  .company-card:hover{border-color:color-mix(in srgb, var(--copper) 40%, var(--line));}
+  .company-card:hover{border-color:color-mix(in srgb, var(--accent) 40%, var(--line));}
   .company-card::before{
-    content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--copper);
+    content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent);
   }
   .card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
-  .card-title{font-size:15px;font-weight:600;}
+  .card-title{font-size:15px;font-weight:600;font-family:'Newsreader',serif;}
   .card-addr{font-size:10.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:3px;}
   .live-dot{
     width:8px;height:8px;border-radius:50%;background:var(--good);
@@ -198,12 +206,12 @@
 
   .gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0;}
   .gauge{text-align:left;background:var(--panel);border-radius:8px;padding:10px 12px;}
-  .gauge .val{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:700;color:var(--copper);}
+  .gauge .val{font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:700;color:var(--accent);}
   .gauge .lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:3px;}
 
   .log-row{
     border-top:1px solid var(--line);padding-top:12px;font-size:12.5px;
-    color:var(--muted);font-style:italic;
+    color:var(--muted);font-style:italic;font-family:'Newsreader',serif;
   }
 
   .empty{
@@ -223,7 +231,7 @@
 
   @media (max-width:640px){
     main{padding:32px 18px 64px;}
-    h2{font-size:24px;}
+    h2{font-size:28px;}
     .gauges{gap:8px;}
     .gauge{padding:8px;}
   }
@@ -253,7 +261,7 @@
 
   <div class="hero">
     <div class="eyebrow">Agent-native companies</div>
-    <h2>Forge a company that runs itself</h2>
+    <h2>Forge a company that <em>runs itself</em></h2>
     <p class="lede">Each company you forge gets its own treasury. It wakes itself up on a Scheduler loop and answers paid requests through the Ritual LLM precompile. No server, no keeper, no you.</p>
   </div>
 
@@ -332,8 +340,7 @@ function applyTheme(theme) {
   if (saved) {
     applyTheme(saved);
   } else {
-    const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
-    applyTheme(prefersLight ? "light" : "dark");
+    applyTheme("light");
   }
 })();
 
