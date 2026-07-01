@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Forge: Ritual Chain</title>
 <meta name="description" content="Deploy autonomous, self-funding companies on Ritual Chain. No server, no keeper, no you." />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='20' y='20' width='60' height='60' fill='none' stroke='%231f4d3d' stroke-width='10' transform='rotate(45 50 50)'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 90 90'%3E%3Cpolygon points='45,14 76,45 45,76 14,45' fill='none' stroke='%231f4d3d' stroke-width='7'/%3E%3Ccircle cx='45' cy='45' r='7' fill='%231f4d3d'/%3E%3Cline x1='45' y1='45' x2='45' y2='4' stroke='%231f4d3d' stroke-width='4'/%3E%3Cline x1='45' y1='45' x2='80' y2='45' stroke='%231f4d3d' stroke-width='4'/%3E%3Cline x1='45' y1='45' x2='45' y2='86' stroke='%231f4d3d' stroke-width='4'/%3E%3Cline x1='45' y1='45' x2='10' y2='45' stroke='%231f4d3d' stroke-width='4'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,600;1,500;1,600&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -79,17 +79,10 @@
   .brand{display:flex;align-items:center;gap:11px;}
   .brand .mark{
     width:30px;height:30px;
-    border:2px solid var(--accent);
     display:flex;align-items:center;justify-content:center;
-    font-family:'IBM Plex Mono',monospace;
-    font-weight:700;
-    font-size:13px;
     color:var(--accent);
-    transform:rotate(45deg);
     flex-shrink:0;
-    box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
   }
-  .brand .mark span{transform:rotate(-45deg);}
   .brand-text{display:flex;flex-direction:column;gap:1px;}
   .brand h1{font-size:17px;font-weight:600;margin:0;letter-spacing:0.01em;line-height:1.2;font-family:'Newsreader',serif;}
   .brand .sub{font-size:10.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:0.06em;}
@@ -247,7 +240,16 @@
 
 <header>
   <div class="brand">
-    <div class="mark"><span>F</span></div>
+    <div class="mark">
+      <svg width="30" height="30" viewBox="0 0 90 90">
+        <polygon points="45,14 76,45 45,76 14,45" fill="none" stroke="currentColor" stroke-width="7"/>
+        <circle cx="45" cy="45" r="7" fill="currentColor"/>
+        <line x1="45" y1="45" x2="45" y2="4" stroke="currentColor" stroke-width="4"/>
+        <line x1="45" y1="45" x2="80" y2="45" stroke="currentColor" stroke-width="4"/>
+        <line x1="45" y1="45" x2="45" y2="86" stroke="currentColor" stroke-width="4"/>
+        <line x1="45" y1="45" x2="10" y2="45" stroke="currentColor" stroke-width="4"/>
+      </svg>
+    </div>
     <div class="brand-text">
       <h1>Forge</h1>
       <div class="sub">RITUAL CHAIN · TESTNET 1979</div>
