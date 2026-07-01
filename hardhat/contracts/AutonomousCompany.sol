@@ -134,10 +134,13 @@ contract AutonomousCompany {
             depositAmount = address(this).balance;
         }
         if (depositAmount > 0) {
-            try IRitualWallet(RITUAL_WALLET).deposit{value: depositAmount}(SCHEDULER_LOCK_DURATION) {
-                // deposit ok
-            } catch {
-                revert DepositFailed();
+            (bool depOk, bytes memory depResult) = RITUAL_WALLET.call{value: depositAmount}(
+                abi.encodeWithSelector(IRitualWallet.deposit.selector, SCHEDULER_LOCK_DURATION)
+            );
+            if (!depOk) {
+                assembly {
+                    revert(add(depResult, 32), mload(depResult))
+                }
             }
         }
 
@@ -174,22 +177,31 @@ contract AutonomousCompany {
         // Ritual's Scheduler requires frequency == 1 whenever numCalls == 1
         // (frequency only has meaning between multiple calls). The actual
         // delay before this single execution comes from startBlock instead.
-        try IScheduler(SCHEDULER).schedule(
-            data,
-            300000,                         // gas
-            uint32(block.number) + delay,   // startBlock — this is the real delay
-            1,                               // numCalls — single-shot
-            1,                               // frequency — must be 1 for single-shot
-            100,                             // ttl (<= MAX_TTL of 500)
-            block.basefee + 1 gwei,          // maxFeePerGas, small buffer over basefee
-            0,                               // maxPriorityFeePerGas
-            0,                               // value
-            address(this)                    // payer — this contract's RitualWallet balance
-        ) returns (uint256 id) {
-            return id;
-        } catch {
-            revert ScheduleFailed();
+        //
+        // Forward the raw revert reason instead of swallowing it — matches
+        // the proven pattern from PrecompileConsumer.sol so we can see
+        // Ritual's actual error instead of a generic one.
+        (bool ok, bytes memory result) = SCHEDULER.call(
+            abi.encodeWithSelector(
+                IScheduler.schedule.selector,
+                data,
+                uint32(300000),
+                uint32(block.number) + delay,
+                uint32(1),
+                uint32(1),
+                uint32(100),
+                block.basefee + 1 gwei,
+                uint256(0),
+                uint256(0),
+                address(this)
+            )
+        );
+        if (!ok) {
+            assembly {
+                revert(add(result, 32), mload(result))
+            }
         }
+        return abi.decode(result, (uint256));
     }
 
     // Lightweight self-check the LLM performs every heartbeat —
