@@ -1,6 +1,6 @@
 import { network } from "hardhat";
 
-const COMPANY_ADDRESS = "0x3757326524eF3abcA0573Bf838792bE0E6CB6088";
+const COMPANY_ADDRESS = "0xA9BD7E178D05961d5b7194dE353dEbc43905244D";
 
 async function main() {
   const { viem } = await network.connect();
