@@ -45,6 +45,7 @@ async function main() {
       to: latest.addr,
       data: requestData,
       value: latest.feePerRequest,
+      gas: 2_000_000n,
     });
     console.log("tx sent:", txHash);
     const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 120_000 });
