@@ -1,4 +1,4 @@
-# Ritual Agent Factory
+# Forge
 
 A factory contract that spins up autonomous, self-funding, self-scheduling
 "companies" on Ritual Chain — plus a minimal on-chain swap for two demo
