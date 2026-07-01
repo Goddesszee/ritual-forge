@@ -40,28 +40,40 @@ async function main() {
   });
 
   try {
-    const result = await publicClient.call({
-      account,
+    console.log("Sending REAL transaction (LLM precompile is async, eth_call can't simulate the commit/settle round-trip)...");
+    const txHash = await walletClient.sendTransaction({
       to: latest.addr,
       data: requestData,
       value: latest.feePerRequest,
     });
-    console.log("SUCCEEDED:", result);
-  } catch (err: any) {
-    let current = err;
-    let rawData = null;
-    let depth = 0;
-    while (current && depth < 8) {
-      console.log(`--- depth ${depth}: ${current.name} ---`);
-      if (current.message) console.log("  message:", current.message.slice(0, 200));
-      if (current.data && typeof current.data === "string" && current.data.startsWith("0x")) {
-        console.log("  DATA:", current.data);
-        rawData = current.data;
-      }
-      current = current.cause;
-      depth++;
+    console.log("tx sent:", txHash);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash, timeout: 120_000 });
+    console.log("confirmed in block:", receipt.blockNumber.toString(), "status:", receipt.status);
+
+    if (receipt.status === "success") {
+      // Pull the actual response text out of the ServiceDelivered event.
+      const eventAbi = [{
+        type: "event", name: "ServiceDelivered",
+        inputs: [
+          { name: "requester", type: "address", indexed: true },
+          { name: "fee", type: "uint256", indexed: false },
+          { name: "output", type: "string", indexed: false },
+        ],
+      }] as const;
+      const logs = await publicClient.getContractEvents({
+        address: latest.addr,
+        abi: eventAbi,
+        eventName: "ServiceDelivered",
+        fromBlock: receipt.blockNumber,
+        toBlock: receipt.blockNumber,
+      });
+      console.log("\n=== LLM RESPONSE ===");
+      console.log(logs.length > 0 ? logs[0].args.output : "(no ServiceDelivered event found in this block)");
+    } else {
+      console.log("Transaction reverted on-chain.");
     }
-    console.log("\nFinal raw data found:", rawData);
+  } catch (err: any) {
+    console.log("FAILED:", err.shortMessage || err.message);
   }
 }
 
