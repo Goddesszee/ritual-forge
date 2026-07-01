@@ -90,6 +90,8 @@ contract AutonomousCompany {
     error OnlyFactory();
     error AlreadyRunning();
     error InsufficientFee();
+    error DepositFailed();
+    error ScheduleFailed();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert OnlyOwner();
@@ -126,10 +128,20 @@ contract AutonomousCompany {
             depositAmount = address(this).balance;
         }
         if (depositAmount > 0) {
-            IRitualWallet(RITUAL_WALLET).deposit{value: depositAmount}(SCHEDULER_LOCK_DURATION);
+            try IRitualWallet(RITUAL_WALLET).deposit{value: depositAmount}(SCHEDULER_LOCK_DURATION) {
+                // deposit ok
+            } catch {
+                revert DepositFailed();
+            }
         }
 
-        scheduleId = _scheduleWakeup(WAKE_INTERVAL);
+        bytes memory data = abi.encodeWithSelector(this.wakeUp.selector, uint256(0));
+        try IScheduler(SCHEDULER).schedule(data, 300000, 1, WAKE_INTERVAL) returns (uint256 id) {
+            scheduleId = id;
+        } catch {
+            revert ScheduleFailed();
+        }
+
         emit CompanyStarted(block.number);
     }
 
