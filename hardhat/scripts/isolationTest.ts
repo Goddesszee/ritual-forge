@@ -80,6 +80,17 @@ async function main() {
   });
   const fundOk = await rawCall(publicClient, account, companyAddress, fundData, "fundWalletOnly()");
 
+  // Sanity check: call a function that should DEFINITELY fail with a KNOWN,
+  // computable error (InsufficientFee, since feePerRequest > 0 and we send 0),
+  // to verify our error-extraction logic actually works correctly.
+  const requestServiceData = encodeFunctionData({
+    abi: [{ type: "function", name: "requestService", stateMutability: "payable", inputs: [{ name: "input", type: "string" }], outputs: [{ type: "string" }] }],
+    functionName: "requestService",
+    args: ["test"],
+  });
+  console.log("\n--- Sanity check: calling requestService() with 0 value, expect InsufficientFee ---");
+  await rawCall(publicClient, account, companyAddress, requestServiceData, "requestService() [expect InsufficientFee selector, NOT 0x13a6fe64]");
+
   const scheduleData = encodeFunctionData({
     abi: [{ type: "function", name: "scheduleOnly", stateMutability: "nonpayable", inputs: [], outputs: [{ type: "uint256" }] }],
     functionName: "scheduleOnly",
