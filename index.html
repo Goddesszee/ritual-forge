@@ -224,6 +224,15 @@
     color:var(--muted);font-style:italic;font-family:'Newsreader',serif;
   }
 
+  .request-area{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
+  .request-area label{margin-bottom:8px;}
+  .request-area input{margin-bottom:10px;}
+  .response-box{
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:12px 14px;margin-top:10px;font-size:13px;line-height:1.6;
+    font-family:'Newsreader',serif;color:var(--text);
+  }
+
   .empty{
     text-align:center;padding:64px 20px;color:var(--muted);
     border:1.5px dashed var(--line);border-radius:12px;font-size:13.5px;
@@ -582,6 +591,13 @@ async function loadCompanies() {
         </div>
         <div class="log-row" data-field="heartbeat"></div>
         <div data-field="startArea"></div>
+        <div class="request-area" data-field="requestArea">
+          <label>Test this company (pay <span data-field="feeLabel">–</span> RITUAL)</label>
+          <input type="text" data-field="requestInput" placeholder="e.g. 0x86b245d0b48bbdc58f08caea971a24ba377c366a" />
+          <button class="btn small-btn" data-field="requestBtn">Send request</button>
+          <div class="status-line" data-field="requestStatus"></div>
+          <div class="response-box" data-field="responseBox" style="display:none;"></div>
+        </div>
       `;
       grid.appendChild(card);
       hydrateCompanyCard(card, info.addr);
@@ -595,14 +611,16 @@ async function loadCompanies() {
 async function hydrateCompanyCard(card, addr) {
   try {
     const company = new ethers.Contract(addr, COMPANY_ABI, provider);
-    const [wakes, requests, treasury, heartbeat, running, ownerAddr] = await Promise.all([
+    const [wakes, requests, treasury, heartbeat, running, ownerAddr, fee] = await Promise.all([
       company.wakeCount(), company.requestCount(), company.treasuryBalance(),
-      company.lastHeartbeat().catch(() => ""), company.running(), company.owner()
+      company.lastHeartbeat().catch(() => ""), company.running(), company.owner(),
+      company.feePerRequest()
     ]);
     card.querySelector('[data-field="wakes"]').textContent = wakes.toString();
     card.querySelector('[data-field="requests"]').textContent = requests.toString();
     card.querySelector('[data-field="treasury"]').textContent = Number(ethers.formatEther(treasury)).toFixed(4);
     card.querySelector('[data-field="heartbeat"]').textContent = heartbeat ? '"' + heartbeat + '"' : "no heartbeat yet.";
+    card.querySelector('[data-field="feeLabel"]').textContent = ethers.formatEther(fee);
 
     const dot = card.querySelector('[data-field="dot"]');
     const startArea = card.querySelector('[data-field="startArea"]');
@@ -624,8 +642,60 @@ async function hydrateCompanyCard(card, addr) {
       const startBtn = startArea.querySelector("button");
       startBtn.addEventListener("click", () => startCompany(addr, card));
     }
+
+    const reqBtn = card.querySelector('[data-field="requestBtn"]');
+    reqBtn.addEventListener("click", () => requestService(addr, card, fee));
   } catch (e) {
     console.error("hydrate failed for", addr, e);
+  }
+}
+
+async function requestService(addr, card, fee) {
+  const statusEl = card.querySelector('[data-field="requestStatus"]');
+  const responseBox = card.querySelector('[data-field="responseBox"]');
+  const input = card.querySelector('[data-field="requestInput"]');
+  const btn = card.querySelector('[data-field="requestBtn"]');
+
+  if (!signer) { statusEl.textContent = "Connect your wallet first."; statusEl.className = "status-line err"; return; }
+  const inputValue = input.value.trim();
+  if (!inputValue) { statusEl.textContent = "Enter something to send first."; statusEl.className = "status-line err"; return; }
+
+  try {
+    btn.disabled = true;
+    responseBox.style.display = "none";
+    statusEl.textContent = "Confirm the payment in your wallet.";
+    statusEl.className = "status-line";
+    const company = new ethers.Contract(addr, COMPANY_ABI, signer);
+    const tx = await company.requestService(inputValue, { value: fee });
+    statusEl.textContent = "Paid. Waiting for the LLM response.";
+    const receipt = await tx.wait();
+
+    // Pull the response out of the ServiceDelivered event rather than the
+    // eth_call return value, since this was a real state-changing tx.
+    const iface = new ethers.Interface(["event ServiceDelivered(address indexed requester, uint256 fee, string output)"]);
+    let output = null;
+    for (const log of receipt.logs) {
+      try {
+        const parsed = iface.parseLog(log);
+        if (parsed && parsed.name === "ServiceDelivered") {
+          output = parsed.args.output;
+          break;
+        }
+      } catch (e) { /* not this event, skip */ }
+    }
+
+    statusEl.textContent = "Response received.";
+    statusEl.className = "status-line ok";
+    responseBox.style.display = "block";
+    responseBox.textContent = output || "(no output captured, check the transaction on the explorer)";
+    input.value = "";
+    hydrateCompanyCard(card, addr);
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = "Request failed: " + (e.shortMessage || e.message || "unknown error");
+    statusEl.className = "status-line err";
+  } finally {
+    btn.disabled = false;
   }
 }
 
