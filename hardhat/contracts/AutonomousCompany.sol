@@ -35,8 +35,14 @@ interface IScheduler {
     function schedule(
         bytes calldata data,
         uint32 gas,
+        uint32 startBlock,
         uint32 numCalls,
-        uint32 frequency
+        uint32 frequency,
+        uint32 ttl,
+        uint256 maxFeePerGas,
+        uint256 maxPriorityFeePerGas,
+        uint256 value,
+        address payer
     ) external returns (uint256 callId);
     function cancel(uint256 callId) external;
 }
@@ -135,13 +141,7 @@ contract AutonomousCompany {
             }
         }
 
-        bytes memory data = abi.encodeWithSelector(this.wakeUp.selector, uint256(0));
-        try IScheduler(SCHEDULER).schedule(data, 300000, 1, WAKE_INTERVAL) returns (uint256 id) {
-            scheduleId = id;
-        } catch {
-            revert ScheduleFailed();
-        }
-
+        scheduleId = _scheduleWakeup(WAKE_INTERVAL);
         emit CompanyStarted(block.number);
     }
 
@@ -170,7 +170,26 @@ contract AutonomousCompany {
         // First param after the selector must be a placeholder executionIndex —
         // the Scheduler overwrites it with the real value at execution time.
         bytes memory data = abi.encodeWithSelector(this.wakeUp.selector, uint256(0));
-        return IScheduler(SCHEDULER).schedule(data, 300000, 1, delay);
+
+        // Ritual's Scheduler requires frequency == 1 whenever numCalls == 1
+        // (frequency only has meaning between multiple calls). The actual
+        // delay before this single execution comes from startBlock instead.
+        try IScheduler(SCHEDULER).schedule(
+            data,
+            300000,                         // gas
+            uint32(block.number) + delay,   // startBlock — this is the real delay
+            1,                               // numCalls — single-shot
+            1,                               // frequency — must be 1 for single-shot
+            100,                             // ttl (<= MAX_TTL of 500)
+            block.basefee + 1 gwei,          // maxFeePerGas, small buffer over basefee
+            0,                               // maxPriorityFeePerGas
+            0,                               // value
+            address(this)                    // payer — this contract's RitualWallet balance
+        ) returns (uint256 id) {
+            return id;
+        } catch {
+            revert ScheduleFailed();
+        }
     }
 
     // Lightweight self-check the LLM performs every heartbeat —
