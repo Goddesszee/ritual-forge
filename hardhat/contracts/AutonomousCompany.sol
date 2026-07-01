@@ -32,16 +32,27 @@ interface ILLMPrecompile {
 }
 
 interface IScheduler {
-    function schedule(address target, bytes calldata data, uint32 delayBlocks)
-        external returns (uint256 callId);
+    function schedule(
+        bytes calldata data,
+        uint32 gas,
+        uint32 numCalls,
+        uint32 frequency
+    ) external returns (uint256 callId);
     function cancel(uint256 callId) external;
+}
+
+interface IRitualWallet {
+    function deposit(uint256 lockDuration) external payable;
 }
 
 contract AutonomousCompany {
     address internal constant LLM = 0x0000000000000000000000000000000000000802;
     address internal constant SCHEDULER = 0x56e776BAE2DD60664b69Bd5F865F1180ffB7D58B;
+    address internal constant RITUAL_WALLET = 0x532F0dF0896F353d8C3DD8cc134e8129DA2a3948;
 
     uint32 public constant WAKE_INTERVAL = 500; // ~3 min on Ritual testnet
+    uint256 public constant SCHEDULER_FEE_DEPOSIT = 0.005 ether;
+    uint256 public constant SCHEDULER_LOCK_DURATION = 50000;
 
     // ── Identity ────────────────────────────────────────────────
     address public factory;
@@ -107,6 +118,17 @@ contract AutonomousCompany {
         if (msg.sender != owner && msg.sender != factory) revert OnlyOwner();
         if (running) revert AlreadyRunning();
         running = true;
+
+        // Ritual's Scheduler pulls execution fees from RitualWallet, not from
+        // this contract's plain balance. Fund it before the first schedule call.
+        uint256 depositAmount = SCHEDULER_FEE_DEPOSIT;
+        if (address(this).balance < depositAmount) {
+            depositAmount = address(this).balance;
+        }
+        if (depositAmount > 0) {
+            IRitualWallet(RITUAL_WALLET).deposit{value: depositAmount}(SCHEDULER_LOCK_DURATION);
+        }
+
         scheduleId = _scheduleWakeup(WAKE_INTERVAL);
         emit CompanyStarted(block.number);
     }
@@ -133,8 +155,10 @@ contract AutonomousCompany {
     }
 
     function _scheduleWakeup(uint32 delay) internal returns (uint256) {
-        bytes memory data = abi.encodeWithSelector(this.wakeUp.selector, wakeCount + 1);
-        return IScheduler(SCHEDULER).schedule(address(this), data, delay);
+        // First param after the selector must be a placeholder executionIndex —
+        // the Scheduler overwrites it with the real value at execution time.
+        bytes memory data = abi.encodeWithSelector(this.wakeUp.selector, uint256(0));
+        return IScheduler(SCHEDULER).schedule(data, 300000, 1, delay);
     }
 
     // Lightweight self-check the LLM performs every heartbeat —
