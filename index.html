@@ -668,7 +668,23 @@ async function requestService(addr, card, fee) {
     const company = new ethers.Contract(addr, COMPANY_ABI, signer);
     const tx = await company.requestService(inputValue, { value: fee });
     statusEl.textContent = "Paid. Waiting for the LLM response.";
-    const receipt = await tx.wait();
+
+    // NOTE: ethers v6's tx.wait() cannot parse Ritual's async precompile
+    // receipt fields (commitmentTx, settlementTx, spcCalls, oversized
+    // placeholder gas value) and hangs or throws internally. Poll the raw
+    // RPC directly instead.
+    let receipt = null;
+    for (let i = 0; i < 30; i++) {
+      receipt = await provider.send("eth_getTransactionReceipt", [tx.hash]);
+      if (receipt) break;
+      await new Promise((res) => setTimeout(res, 2000));
+    }
+    if (!receipt) {
+      throw new Error("Timed out waiting for the transaction to settle. Check the explorer for tx " + tx.hash);
+    }
+    if (receipt.status !== "0x1") {
+      throw new Error("Transaction reverted on-chain. Check the explorer for tx " + tx.hash);
+    }
 
     // Pull the response out of the ServiceDelivered event rather than the
     // eth_call return value, since this was a real state-changing tx.
