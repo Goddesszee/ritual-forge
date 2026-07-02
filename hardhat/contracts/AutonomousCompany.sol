@@ -284,7 +284,8 @@ contract AutonomousCompany {
             int256(1000),        // topP (1.0 * 1000)
             "",                  // user
             false,               // piiEnabled
-            abi.encode("", "", "") // convoHistory StorageRef, empty = no persisted history
+            StorageRef("", "", "") // convoHistory: must be an inline (string,string,string) tuple,
+                                    // NOT a separately abi.encode()'d bytes blob — that was the bug.
         );
 
         (bool ok, bytes memory result) = LLM.call(input);
