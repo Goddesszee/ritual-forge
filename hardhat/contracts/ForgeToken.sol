@@ -2,17 +2,16 @@
 pragma solidity ^0.8.24;
 
 // ================================================================
-//  TestToken — minimal ERC20 with a public faucet.
+//  ForgeToken (FORGE) — minimal ERC20 for the Forge ecosystem.
 //
-//  Ritual testnet has no deep native liquidity, so this deploys two
-//  demo tokens (RTA / RTB) that anyone can mint in small amounts to
-//  test the swap feature. Clearly a testnet/demo instrument, not a
-//  real asset.
+//  Includes a public faucet so anyone can claim demo FORGE without
+//  needing to already hold any before the swap pool exists. Paired
+//  1:1 in liquidity terms against native RITUAL via RitualForgeSwap.
 // ================================================================
 
-contract TestToken {
-    string public name;
-    string public symbol;
+contract ForgeToken {
+    string public constant name = "Forge Token";
+    string public constant symbol = "FORGE";
     uint8 public constant decimals = 18;
     uint256 public totalSupply;
 
@@ -20,16 +19,14 @@ contract TestToken {
     mapping(address => mapping(address => uint256)) public allowance;
     mapping(address => uint256) public lastFaucetClaim;
 
-    uint256 public constant FAUCET_AMOUNT = 1000 * 1e18;
+    uint256 public constant FAUCET_AMOUNT = 100 * 1e18;
     uint256 public constant FAUCET_COOLDOWN = 1 hours;
 
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
     event FaucetClaim(address indexed to, uint256 amount);
 
-    constructor(string memory _name, string memory _symbol, uint256 initialSupply) {
-        name = _name;
-        symbol = _symbol;
+    constructor(uint256 initialSupply) {
         _mint(msg.sender, initialSupply);
     }
 
@@ -54,7 +51,8 @@ contract TestToken {
         return true;
     }
 
-    /// @notice Anyone can claim demo tokens once per hour to test the swap.
+    /// @notice Anyone can claim demo FORGE once per hour, so testers can
+    ///         try the swap without already holding any.
     function faucet() external {
         require(block.timestamp >= lastFaucetClaim[msg.sender] + FAUCET_COOLDOWN, "faucet cooldown active");
         lastFaucetClaim[msg.sender] = block.timestamp;
