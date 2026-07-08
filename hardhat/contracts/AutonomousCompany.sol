@@ -21,6 +21,12 @@ pragma solidity ^0.8.24;
 // ================================================================
 
 interface IScheduler {
+    // 10-param signature per Ritual's official documented example
+    // (docs.ritualfoundation.org — Scheduled Transactions). There is no
+    // trailing `predicate` argument on this function; predicates are a
+    // separate conditional-execution mechanism, not an 11th positional
+    // param here. The earlier 11-param version was the root cause of
+    // every `schedule()` revert recorded in RITUAL_BUG_REPORT.md.
     function schedule(
         bytes calldata data,
         uint32 gas,
@@ -31,8 +37,7 @@ interface IScheduler {
         uint256 maxFeePerGas,
         uint256 maxPriorityFeePerGas,
         uint256 value,
-        address payer,
-        address predicate
+        address payer
     ) external returns (uint256 callId);
     function cancel(uint256 callId) external;
 }
@@ -71,8 +76,9 @@ contract AutonomousCompany {
     string internal constant MODEL = "zai-org/GLM-4.7-FP8";
 
     uint32 public constant WAKE_INTERVAL = 500; // ~3 min on Ritual testnet
-    uint256 public constant SCHEDULER_FEE_DEPOSIT = 0.005 ether;
+    uint256 public constant SCHEDULER_FEE_DEPOSIT = 0.005 ether; // initial deposit at start()
     uint256 public constant SCHEDULER_LOCK_DURATION = 50000;
+    uint256 public constant WAKE_TOPUP_AMOUNT = 0.0005 ether; // small trickle top-up every wake
 
     // ── Identity ────────────────────────────────────────────────
     address public factory;
@@ -104,14 +110,21 @@ contract AutonomousCompany {
     event WokeUp(uint256 wakeCount, uint256 atBlock, string note);
     event ServiceDelivered(address indexed requester, uint256 fee, string output);
     event Withdrawn(address indexed to, uint256 amount);
+    /// @notice Emitted when a wake-up succeeds but the self-reschedule fails.
+    ///         The company is still `running` but has no live Scheduler
+    ///         callback — call `kick()` to recover instead of losing it.
+    event RescheduleFailed(uint256 atBlock, bytes reason);
+    /// @notice Emitted when `kick()` successfully re-arms a stalled company.
+    event Kicked(uint256 newScheduleId, uint256 atBlock);
+    /// @notice Emitted when a periodic RitualWallet top-up (from wakeUp)
+    ///         fails to send. Non-fatal — the wake-up still completes.
+    event WalletTopUpFailed(uint256 attempted);
 
     error OnlyOwner();
     error OnlyScheduler();
-    error OnlyFactory();
     error AlreadyRunning();
+    error NotRunning();
     error InsufficientFee();
-    error DepositFailed();
-    error ScheduleFailed();
     error NoExecutorAvailable();
 
     modifier onlyOwner() {
@@ -141,23 +154,44 @@ contract AutonomousCompany {
         if (msg.sender != owner && msg.sender != factory) revert OnlyOwner();
         if (running) revert AlreadyRunning();
         running = true;
-        _fundWallet();
-        scheduleId = _scheduleWakeup(WAKE_INTERVAL);
+        _fundWallet(SCHEDULER_FEE_DEPOSIT);
+        (bool ok, uint256 callId) = _scheduleWakeup(WAKE_INTERVAL);
+        require(ok, "initial schedule failed");
+        scheduleId = callId;
         emit CompanyStarted(block.number);
     }
 
     /// @notice Step 1 only, callable independently for isolated testing.
     function fundWalletOnly() external onlyOwner {
-        _fundWallet();
+        _fundWallet(SCHEDULER_FEE_DEPOSIT);
     }
 
     /// @notice Step 2 only, callable independently for isolated testing.
     function scheduleOnly() external onlyOwner returns (uint256) {
-        return _scheduleWakeup(WAKE_INTERVAL);
+        (bool ok, uint256 callId) = _scheduleWakeup(WAKE_INTERVAL);
+        require(ok, "schedule failed");
+        return callId;
     }
 
-    function _fundWallet() internal {
-        uint256 depositAmount = SCHEDULER_FEE_DEPOSIT;
+    /// @notice Recovery valve. If a wake-up's self-reschedule ever fails
+    ///         (see RescheduleFailed), the company is left `running` with
+    ///         no live Scheduler callback and would otherwise be dead
+    ///         forever. Owner calls this to re-fund and re-arm it —
+    ///         no need to stop() first.
+    function kick() external onlyOwner {
+        if (!running) revert NotRunning();
+        _fundWallet(SCHEDULER_FEE_DEPOSIT);
+        (bool ok, uint256 callId) = _scheduleWakeup(WAKE_INTERVAL);
+        require(ok, "kick: schedule still failing");
+        scheduleId = callId;
+        emit Kicked(callId, block.number);
+    }
+
+    /// @notice Deposits up to `amount` (capped by current balance) into
+    ///         RitualWallet. Reverts on failure — used at start() where
+    ///         we want to know immediately if funding didn't work.
+    function _fundWallet(uint256 amount) internal {
+        uint256 depositAmount = amount;
         if (address(this).balance < depositAmount) {
             depositAmount = address(this).balance;
         }
@@ -171,6 +205,20 @@ contract AutonomousCompany {
                 }
             }
         }
+    }
+
+    /// @notice Same deposit, but never reverts. Used inside wakeUp() so a
+    ///         top-up hiccup can't take down the whole heartbeat.
+    function _tryTopUpWallet(uint256 amount) internal returns (bool) {
+        uint256 depositAmount = amount;
+        if (address(this).balance < depositAmount) {
+            depositAmount = address(this).balance;
+        }
+        if (depositAmount == 0) return true;
+        (bool depOk, ) = RITUAL_WALLET.call{value: depositAmount}(
+            abi.encodeWithSelector(IRitualWallet.deposit.selector, SCHEDULER_LOCK_DURATION)
+        );
+        return depOk;
     }
 
     function wakeUp(uint256) external {
@@ -191,7 +239,28 @@ contract AutonomousCompany {
             lastHeartbeat = "llm call reverted (no reason)";
         }
 
-        scheduleId = _scheduleWakeup(WAKE_INTERVAL);
+        // Small trickle top-up every cycle so the RitualWallet balance
+        // that pays for scheduling never quietly runs dry between
+        // deposits — non-reverting, since a top-up hiccup shouldn't
+        // take down the heartbeat.
+        if (!_tryTopUpWallet(WAKE_TOPUP_AMOUNT)) {
+            emit WalletTopUpFailed(WAKE_TOPUP_AMOUNT);
+        }
+
+        // Reschedule the next wake. If this fails, DO NOT revert the whole
+        // wake-up (that would erase wakeCount/heartbeat and, worse, leave
+        // no on-chain trace of why the company went quiet). Instead: keep
+        // this wake-up's effects, record the failure, and leave `running`
+        // true with scheduleId cleared so an off-chain watcher can see it
+        // and the owner can call kick() to recover.
+        (bool schedOk, uint256 callId) = _scheduleWakeup(WAKE_INTERVAL);
+        if (schedOk) {
+            scheduleId = callId;
+        } else {
+            scheduleId = 0;
+            emit RescheduleFailed(block.number, bytes("scheduler.schedule() reverted"));
+        }
+
         emit WokeUp(wakeCount, block.number, lastHeartbeat);
     }
 
@@ -202,7 +271,10 @@ contract AutonomousCompany {
         }
     }
 
-    function _scheduleWakeup(uint32 delay) internal returns (uint256) {
+    /// @notice Never reverts — returns success/failure instead so callers
+    ///         can decide how to react (start()/kick() require success,
+    ///         wakeUp() tolerates failure and recovers via kick()).
+    function _scheduleWakeup(uint32 delay) internal returns (bool, uint256) {
         bytes memory data = abi.encodeWithSelector(this.wakeUp.selector, uint256(0));
 
         (bool ok, bytes memory result) = SCHEDULER.call(
@@ -217,16 +289,13 @@ contract AutonomousCompany {
                 block.basefee + 1 gwei,
                 uint256(0),
                 uint256(0),
-                address(this),
-                address(0)
+                address(this)
             )
         );
         if (!ok) {
-            assembly {
-                revert(add(result, 32), mload(result))
-            }
+            return (false, 0);
         }
-        return abi.decode(result, (uint256));
+        return (true, abi.decode(result, (uint256)));
     }
 
     // ══════════════════════════════════════════════════════════
