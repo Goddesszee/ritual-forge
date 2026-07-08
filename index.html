@@ -312,6 +312,19 @@
   </div>
 
   <div class="panel">
+    <h3>Swap <span class="mono">RITUAL</span> ⇄ <span class="mono">FORGE</span></h3>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <button class="btn small-btn" id="swapDirBtn" type="button">RITUAL → FORGE</button>
+      <button class="btn small-btn" id="forgeFaucetBtn" type="button" style="background:var(--panel-2);color:var(--accent);border:1px solid var(--line);">Claim FORGE faucet</button>
+    </div>
+    <label id="swapInLabel">You pay (RITUAL)</label>
+    <input id="swapAmountIn" type="number" step="0.0001" placeholder="0.1" />
+    <div class="status-line" id="swapQuote">Enter an amount to see a quote.</div>
+    <button class="btn" id="swapBtn" style="margin-top:12px;"><span class="spinner"></span><span class="btn-label">Swap</span></button>
+    <div class="status-line" id="swapStatus"></div>
+  </div>
+
+  <div class="panel">
     <h3>Live companies <span class="count-pill" id="companyCount">0</span></h3>
     <div id="companyList"></div>
   </div>
@@ -335,6 +348,11 @@ const CONFIG = {
   chainName: "Ritual Chain Testnet",
   explorer: "https://explorer.ritualfoundation.org",
   factoryAddress: "0xaf7d65161ec56bf2efdafc70d23411c1624e033f",
+  // Fill these in after deploying ForgeToken + RitualForgeSwap and
+  // running scripts/seedForgeLiquidity.ts. Left blank, the swap panel
+  // just tells the user the pool isn't deployed yet.
+  forgeTokenAddress: "",
+  swapAddress: "",
 };
 
 const FACTORY_ABI = [
@@ -358,7 +376,23 @@ const COMPANY_ABI = [
   "function owner() view returns (address)"
 ];
 
+const FORGE_TOKEN_ABI = [
+  "function balanceOf(address) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function faucet()"
+];
+
+const SWAP_ABI = [
+  "function swapRitualForForge(uint256 minForgeOut) payable returns (uint256)",
+  "function swapForgeForRitual(uint256 forgeAmountIn, uint256 minRitualOut) returns (uint256)",
+  "function quoteRitualToForge(uint256 ritualIn) view returns (uint256)",
+  "function quoteForgeToRitual(uint256 forgeIn) view returns (uint256)",
+  "function getReserves() view returns (uint256, uint256)"
+];
+
 let provider, signer, userAddress;
+let swapDirection = "r2f"; // "r2f" = RITUAL -> FORGE, "f2r" = FORGE -> RITUAL
+let lastQuoteOutWei = 0n;
 
 // ---- animated wireframe background ----
 (function initBackground() {
@@ -747,8 +781,142 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// ---- swap panel ----
+const swapDirBtn = document.getElementById("swapDirBtn");
+const swapInLabel = document.getElementById("swapInLabel");
+const swapAmountIn = document.getElementById("swapAmountIn");
+const swapQuote = document.getElementById("swapQuote");
+const swapBtn = document.getElementById("swapBtn");
+const swapBtnLabel = swapBtn.querySelector(".btn-label");
+const swapStatus = document.getElementById("swapStatus");
+const forgeFaucetBtn = document.getElementById("forgeFaucetBtn");
+
+swapDirBtn.addEventListener("click", () => {
+  swapDirection = swapDirection === "r2f" ? "f2r" : "r2f";
+  swapDirBtn.textContent = swapDirection === "r2f" ? "RITUAL → FORGE" : "FORGE → RITUAL";
+  swapInLabel.textContent = swapDirection === "r2f" ? "You pay (RITUAL)" : "You pay (FORGE)";
+  swapAmountIn.value = "";
+  swapQuote.textContent = "Enter an amount to see a quote.";
+  lastQuoteOutWei = 0n;
+});
+
+swapAmountIn.addEventListener("input", updateSwapQuote);
+
+async function updateSwapQuote() {
+  if (!CONFIG.swapAddress) {
+    swapQuote.textContent = "Swap pool not deployed yet.";
+    return;
+  }
+  const val = swapAmountIn.value;
+  if (!val || Number(val) <= 0) {
+    swapQuote.textContent = "Enter an amount to see a quote.";
+    lastQuoteOutWei = 0n;
+    return;
+  }
+  try {
+    if (!provider) provider = new ethers.BrowserProvider(window.ethereum, "any");
+    const swap = new ethers.Contract(CONFIG.swapAddress, SWAP_ABI, provider);
+    const amountWei = ethers.parseEther(val);
+    if (swapDirection === "r2f") {
+      const out = await swap.quoteRitualToForge(amountWei);
+      lastQuoteOutWei = out;
+      swapQuote.textContent = "≈ " + Number(ethers.formatEther(out)).toFixed(4) + " FORGE";
+    } else {
+      const out = await swap.quoteForgeToRitual(amountWei);
+      lastQuoteOutWei = out;
+      swapQuote.textContent = "≈ " + Number(ethers.formatEther(out)).toFixed(6) + " RITUAL";
+    }
+  } catch (e) {
+    console.error(e);
+    lastQuoteOutWei = 0n;
+    swapQuote.textContent = "Could not fetch a quote (pool may not have liquidity yet).";
+  }
+}
+
+forgeFaucetBtn.addEventListener("click", async () => {
+  if (!signer) { swapStatus.textContent = "Connect your wallet first."; swapStatus.className = "status-line err"; return; }
+  if (!CONFIG.forgeTokenAddress) { swapStatus.textContent = "FORGE token not deployed yet."; swapStatus.className = "status-line err"; return; }
+  try {
+    forgeFaucetBtn.disabled = true;
+    swapStatus.textContent = "Confirm the faucet claim in your wallet.";
+    swapStatus.className = "status-line";
+    const forge = new ethers.Contract(CONFIG.forgeTokenAddress, FORGE_TOKEN_ABI, signer);
+    const tx = await forge.faucet();
+    await waitForReceipt(tx.hash);
+    swapStatus.textContent = "Claimed 100 FORGE.";
+    swapStatus.className = "status-line ok";
+  } catch (e) {
+    console.error(e);
+    swapStatus.textContent = "Faucet claim failed: " + (e.shortMessage || e.message || "unknown error");
+    swapStatus.className = "status-line err";
+  } finally {
+    forgeFaucetBtn.disabled = false;
+  }
+});
+
+swapBtn.addEventListener("click", async () => {
+  if (!signer) { swapStatus.textContent = "Connect your wallet first."; swapStatus.className = "status-line err"; return; }
+  if (!CONFIG.swapAddress || !CONFIG.forgeTokenAddress) {
+    swapStatus.textContent = "Swap pool not deployed yet.";
+    swapStatus.className = "status-line err";
+    return;
+  }
+  const val = swapAmountIn.value;
+  if (!val || Number(val) <= 0) { swapStatus.textContent = "Enter an amount first."; swapStatus.className = "status-line err"; return; }
+
+  // 5% slippage tolerance off the last fetched quote. If no quote is
+  // cached yet (e.g. quote fetch failed), fall back to accepting any
+  // output rather than blocking the swap outright.
+  const minOut = lastQuoteOutWei > 0n ? (lastQuoteOutWei * 95n) / 100n : 0n;
+
+  try {
+    swapBtn.disabled = true;
+    swapBtn.classList.add("loading");
+    swapBtnLabel.textContent = "Swapping";
+    const amountWei = ethers.parseEther(val);
+    const swap = new ethers.Contract(CONFIG.swapAddress, SWAP_ABI, signer);
+
+    if (swapDirection === "r2f") {
+      swapStatus.textContent = "Confirm the swap in your wallet.";
+      swapStatus.className = "status-line";
+      const tx = await swap.swapRitualForForge(minOut, { value: amountWei });
+      swapStatus.textContent = "Swapping. Waiting for confirmation.";
+      const receipt = await waitForReceipt(tx.hash);
+      if (receipt.status !== "0x1") throw new Error("Swap reverted on-chain. Check the explorer for tx " + tx.hash);
+    } else {
+      const forge = new ethers.Contract(CONFIG.forgeTokenAddress, FORGE_TOKEN_ABI, signer);
+      swapStatus.textContent = "Approving FORGE spend.";
+      swapStatus.className = "status-line";
+      const approveTx = await forge.approve(CONFIG.swapAddress, amountWei);
+      await waitForReceipt(approveTx.hash);
+      swapStatus.textContent = "Confirm the swap in your wallet.";
+      const tx = await swap.swapForgeForRitual(amountWei, minOut);
+      swapStatus.textContent = "Swapping. Waiting for confirmation.";
+      const receipt = await waitForReceipt(tx.hash);
+      if (receipt.status !== "0x1") throw new Error("Swap reverted on-chain. Check the explorer for tx " + tx.hash);
+    }
+
+    swapStatus.textContent = "Swap complete.";
+    swapStatus.className = "status-line ok";
+    swapAmountIn.value = "";
+    swapQuote.textContent = "Enter an amount to see a quote.";
+    lastQuoteOutWei = 0n;
+  } catch (e) {
+    console.error(e);
+    swapStatus.textContent = "Swap failed: " + (e.shortMessage || e.message || "unknown error");
+    swapStatus.className = "status-line err";
+  } finally {
+    swapBtn.disabled = false;
+    swapBtn.classList.remove("loading");
+    swapBtnLabel.textContent = "Swap";
+  }
+});
+
 window.addEventListener("load", () => {
   loadCompanies();
+  if (!CONFIG.swapAddress) {
+    swapQuote.textContent = "Swap pool not deployed yet.";
+  }
 });
 </script>
 </body>
