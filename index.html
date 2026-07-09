@@ -791,13 +791,13 @@ function setDeployLoading(loading) {
 // receipt fields and hangs/throws on every tx type, not just calls that
 // touch an async precompile. Poll the raw RPC directly instead everywhere
 // we'd normally call tx.wait().
-async function waitForReceipt(hash, tries = 60, intervalMs = 3000) {
+async function waitForReceipt(hash, tries = 120, intervalMs = 3000) {
   for (let i = 0; i < tries; i++) {
     const receipt = await provider.send("eth_getTransactionReceipt", [hash]);
     if (receipt) return receipt;
     await new Promise((res) => setTimeout(res, intervalMs));
   }
-  throw new Error("Timed out waiting for the transaction to settle. Check the explorer for tx " + hash);
+  throw new Error("Still pending after 6 minutes — this may just be network congestion. Check it directly: " + CONFIG.explorer + "/tx/" + hash);
 }
 
 async function deployCompany() {
