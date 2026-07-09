@@ -552,7 +552,7 @@
   <div class="help-panel-head">
     <div>
       <h4>Ask Forge</h4>
-      <p>Quick answers, not a live chat</p>
+      <p>Ask about deploying, wake cycles, swap, and more</p>
     </div>
     <button class="help-close" id="helpClose" aria-label="Close">✕</button>
   </div>
@@ -1384,19 +1384,56 @@ function renderHelpTopics() {
   });
 }
 
-function askHelp(text) {
+let helpHistory = [];
+let helpTypingEl = null;
+
+function showHelpTyping() {
+  helpTypingEl = document.createElement("div");
+  helpTypingEl.className = "help-msg bot";
+  helpTypingEl.textContent = "…";
+  helpMessages.appendChild(helpTypingEl);
+  helpMessages.scrollTop = helpMessages.scrollHeight;
+}
+function clearHelpTyping() {
+  if (helpTypingEl) { helpTypingEl.remove(); helpTypingEl = null; }
+}
+
+async function askHelp(text) {
   const trimmed = text.trim();
   if (!trimmed) return;
   addHelpMessage(trimmed, "user");
-  const answer = answerHelpQuestion(trimmed);
-  setTimeout(() => addHelpMessage(answer, "bot"), 250);
   helpInput.value = "";
+  helpSendBtn.disabled = true;
+  showHelpTyping();
+
+  try {
+    const resp = await fetch("/api/help", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: trimmed, history: helpHistory }),
+    });
+    if (!resp.ok) throw new Error("help endpoint returned " + resp.status);
+    const data = await resp.json();
+    if (!data.reply) throw new Error("empty reply");
+
+    clearHelpTyping();
+    addHelpMessage(data.reply, "bot");
+    helpHistory.push({ role: "user", content: trimmed });
+    helpHistory.push({ role: "assistant", content: data.reply });
+    helpHistory = helpHistory.slice(-8);
+  } catch (e) {
+    console.error("AI help failed, falling back to scripted FAQ:", e);
+    clearHelpTyping();
+    addHelpMessage(answerHelpQuestion(trimmed), "bot");
+  } finally {
+    helpSendBtn.disabled = false;
+  }
 }
 
 helpFab.addEventListener("click", () => {
   helpPanel.classList.toggle("open");
   if (helpPanel.classList.contains("open") && helpMessages.children.length === 0) {
-    addHelpMessage("Hey — I'm a scripted FAQ, not a live AI, but I can walk you through how Forge works. Tap a topic below or type a question.", "bot");
+    addHelpMessage("Hey — ask me anything about how Forge works. If the AI backend isn't reachable I'll fall back to a scripted FAQ automatically.", "bot");
     renderHelpTopics();
   }
 });
