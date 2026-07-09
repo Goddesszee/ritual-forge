@@ -653,6 +653,7 @@ async function connectWallet() {
     loadCompanies();
     refreshBalances();
     refreshPoolStatus();
+    if (swapStatus) { swapStatus.textContent = ""; swapStatus.className = "status-line"; }
   } catch (e) {
     console.error(e);
   }
@@ -965,6 +966,8 @@ function toToken() {
 
 function openSwapModal() {
   swapModalBackdrop.classList.add("open");
+  swapStatus.textContent = "";
+  swapStatus.className = "status-line";
   refreshBalances();
   refreshPoolStatus();
 }
