@@ -343,6 +343,68 @@
   }
   .faucet-link:hover{color:var(--accent);text-decoration:underline;}
 
+  /* ── Help assistant ── */
+  .help-fab{
+    position:fixed;bottom:22px;right:22px;z-index:90;
+    width:52px;height:52px;border-radius:50%;background:var(--accent);
+    color:var(--on-accent);border:none;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 20px rgba(0,0,0,0.25);
+    transition:transform 0.15s ease;
+  }
+  .help-fab:hover{transform:scale(1.06);}
+  .help-fab svg{width:22px;height:22px;}
+  .help-panel{
+    position:fixed;bottom:86px;right:22px;z-index:91;
+    width:340px;max-width:calc(100vw - 32px);max-height:min(520px, 70vh);
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.3);
+    display:none;flex-direction:column;overflow:hidden;
+  }
+  .help-panel.open{display:flex;}
+  .help-panel-head{
+    padding:14px 16px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--panel-2);flex-shrink:0;
+  }
+  .help-panel-head h4{margin:0;font-family:'Newsreader',serif;font-size:16px;font-weight:600;}
+  .help-panel-head p{margin:2px 0 0;font-size:10.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+  .help-close{
+    background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;
+    width:26px;height:26px;border-radius:50%;flex-shrink:0;
+  }
+  .help-close:hover{color:var(--text);background:var(--panel);}
+  .help-messages{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
+  .help-msg{font-size:12.5px;line-height:1.5;max-width:88%;padding:9px 12px;border-radius:10px;}
+  .help-msg.bot{background:var(--panel-2);color:var(--text);align-self:flex-start;border-bottom-left-radius:3px;}
+  .help-msg.user{background:var(--accent);color:var(--on-accent);align-self:flex-end;border-bottom-right-radius:3px;font-family:'IBM Plex Mono',monospace;}
+  .help-topics{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 12px;flex-shrink:0;}
+  .help-topic-btn{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    border-radius:100px;padding:5px 11px;font-size:11px;cursor:pointer;
+    font-family:'IBM Plex Mono',monospace;transition:border-color 0.15s ease;
+  }
+  .help-topic-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .help-input-row{
+    display:flex;gap:8px;padding:12px;border-top:1px solid var(--line);flex-shrink:0;
+  }
+  .help-input-row input{
+    flex:1;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    padding:9px 12px;font-size:12.5px;color:var(--text);outline:none;
+    font-family:inherit;
+  }
+  .help-input-row input:focus{border-color:var(--accent);}
+  .help-send-btn{
+    background:var(--accent);color:var(--on-accent);border:none;border-radius:8px;
+    padding:0 14px;font-size:12px;font-weight:700;cursor:pointer;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .help-send-btn:hover{filter:brightness(1.1);}
+  @media(max-width:480px){
+    .help-panel{right:12px;bottom:78px;width:calc(100vw - 24px);}
+    .help-fab{right:14px;bottom:14px;}
+  }
+
   .status-line{font-size:12.5px;color:var(--muted);margin-top:14px;font-family:'IBM Plex Mono',monospace;min-height:16px;}
   .status-line.err{color:var(--bad);}
   .status-line.ok{color:var(--good);}
@@ -478,6 +540,29 @@
   </div>
 
 </main>
+
+<button class="help-fab" id="helpFab" title="Ask about Forge" aria-label="Open help assistant">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 10.5h.01M12 10.5h.01M16 10.5h.01"/>
+    <path d="M21 12c0 4.418-4.03 8-9 8-1.06 0-2.078-.163-3.02-.463L3 21l1.5-4.5C3.55 15.14 3 13.62 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+  </svg>
+</button>
+
+<div class="help-panel" id="helpPanel">
+  <div class="help-panel-head">
+    <div>
+      <h4>Ask Forge</h4>
+      <p>Quick answers, not a live chat</p>
+    </div>
+    <button class="help-close" id="helpClose" aria-label="Close">✕</button>
+  </div>
+  <div class="help-messages" id="helpMessages"></div>
+  <div class="help-topics" id="helpTopics"></div>
+  <div class="help-input-row">
+    <input id="helpInput" type="text" placeholder="Ask a question…" />
+    <button class="help-send-btn" id="helpSendBtn">Ask</button>
+  </div>
+</div>
 
 <footer>
   <span>forge</span>
@@ -1193,6 +1278,132 @@ swapBtn.addEventListener("click", async () => {
     swapBtn.classList.remove("loading");
     swapBtnLabel.textContent = "Swap " + activeFrom + " ↔ " + activeTo;
   }
+});
+
+// ---- help assistant (scripted, no API calls) ----
+const HELP_KB = [
+  {
+    topic: "What is Forge?",
+    keywords: ["what is forge", "what does forge do", "about forge", "explain forge"],
+    answer: "Forge lets you deploy an agent-native company on Ritual Chain. Each company gets its own treasury, wakes itself up on a Scheduler loop, and answers paid requests through Ritual's LLM precompile — no server or keeper needed."
+  },
+  {
+    topic: "How do I deploy a company?",
+    keywords: ["deploy", "create company", "forge company", "new company", "how do i deploy"],
+    answer: "Fill in Company type (a short label like 'Reputation Scorer'), a System prompt (what the LLM should do when paid), a Fee per request in RITUAL, and Initial treasury funding in RITUAL. Then click 'Forge company' and confirm the transaction in your wallet."
+  },
+  {
+    topic: "What does Start company do?",
+    keywords: ["start company", "what does start do", "what happens when i start"],
+    answer: "Start company funds the company's RitualWallet and registers its first Scheduler wake-up. Until you click it, the company just sits there with no heartbeat — it needs Start to actually begin waking itself up on a loop."
+  },
+  {
+    topic: "Why does it say \"no heartbeat yet\"?",
+    keywords: ["no heartbeat", "not scheduled", "why isn't it waking", "wake cycles stuck", "not waking up"],
+    answer: "That just means the company hasn't had its first Scheduler wake-up yet. Click 'Start company' if you haven't, then check back in a few minutes — Wake Cycles should tick up from 0 once the Scheduler calls it."
+  },
+  {
+    topic: "Why did Start fail?",
+    keywords: ["start failed", "execution reverted", "custom error", "transaction failed"],
+    answer: "A 'Start failed: execution reverted' error usually means the company was deployed on an outdated factory contract. Companies deployed before a fix went live can be permanently stuck this way — deploying a fresh company through the current form should work correctly."
+  },
+  {
+    topic: "How do I test a company?",
+    keywords: ["test company", "send request", "how do i pay", "try a company"],
+    answer: "Paste your own wallet address into the 'Test this company' field and click Send request — that pays the company's fee and asks it to respond via the LLM precompile. Confirm the payment in your wallet, then wait for the response."
+  },
+  {
+    topic: "What are Wake Cycles / Requests / Treasury?",
+    keywords: ["wake cycles", "requests mean", "treasury mean", "what do the numbers mean"],
+    answer: "Wake Cycles = how many times the Scheduler has woken this company up. Requests = how many times someone has paid it for a response. Treasury = how much RITUAL the company currently holds, used to pay for its own upkeep."
+  },
+  {
+    topic: "What is FORGE token?",
+    keywords: ["forge token", "what is forge coin", "faucet"],
+    answer: "FORGE is a demo ERC20 token that trades against native RITUAL in the Swap modal. You can claim 100 FORGE per hour for free from the faucet button inside the Swap modal — no need to already hold any."
+  },
+  {
+    topic: "How does the swap work?",
+    keywords: ["how does swap work", "swap ritual", "swap forge", "exchange rate"],
+    answer: "Click 'Swap' in the top nav. Pick a direction with the flip button, type an amount, and the rate updates live. It's a simple constant-product pool with a 0.3% fee — if it says 'Pool empty', there's no liquidity yet and swaps will fail until someone seeds it."
+  },
+  {
+    topic: "What network do I need?",
+    keywords: ["what network", "which chain", "gas token", "testnet", "wrong network"],
+    answer: "Forge runs on Ritual Chain testnet (chain ID 1979). You'll need testnet RITUAL in your wallet for gas and for funding companies — it has no real value, it's for testing only."
+  },
+];
+
+const HELP_TOPICS_SHOWN = [
+  "What is Forge?",
+  "How do I deploy a company?",
+  "Why does it say \"no heartbeat yet\"?",
+  "How does the swap work?",
+];
+
+const helpFab = document.getElementById("helpFab");
+const helpPanel = document.getElementById("helpPanel");
+const helpClose = document.getElementById("helpClose");
+const helpMessages = document.getElementById("helpMessages");
+const helpTopics = document.getElementById("helpTopics");
+const helpInput = document.getElementById("helpInput");
+const helpSendBtn = document.getElementById("helpSendBtn");
+
+function addHelpMessage(text, sender) {
+  const div = document.createElement("div");
+  div.className = "help-msg " + sender;
+  div.textContent = text;
+  helpMessages.appendChild(div);
+  helpMessages.scrollTop = helpMessages.scrollHeight;
+}
+
+function answerHelpQuestion(question) {
+  const q = question.toLowerCase();
+  let best = null;
+  let bestScore = 0;
+  for (const entry of HELP_KB) {
+    let score = 0;
+    for (const kw of entry.keywords) {
+      if (q.includes(kw)) score += kw.split(" ").length;
+    }
+    if (score > bestScore) { bestScore = score; best = entry; }
+  }
+  if (best && bestScore > 0) return best.answer;
+  return "I don't have a scripted answer for that one — this is a fixed FAQ, not a live AI, so it only knows the topics in the buttons above. Try rephrasing, or ask about deploying, starting, wake cycles, the swap, or the FORGE faucet.";
+}
+
+function renderHelpTopics() {
+  helpTopics.innerHTML = "";
+  HELP_TOPICS_SHOWN.forEach((topic) => {
+    const btn = document.createElement("button");
+    btn.className = "help-topic-btn";
+    btn.type = "button";
+    btn.textContent = topic;
+    btn.addEventListener("click", () => askHelp(topic));
+    helpTopics.appendChild(btn);
+  });
+}
+
+function askHelp(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  addHelpMessage(trimmed, "user");
+  const answer = answerHelpQuestion(trimmed);
+  setTimeout(() => addHelpMessage(answer, "bot"), 250);
+  helpInput.value = "";
+}
+
+helpFab.addEventListener("click", () => {
+  helpPanel.classList.toggle("open");
+  if (helpPanel.classList.contains("open") && helpMessages.children.length === 0) {
+    addHelpMessage("Hey — I'm a scripted FAQ, not a live AI, but I can walk you through how Forge works. Tap a topic below or type a question.", "bot");
+    renderHelpTopics();
+  }
+});
+helpClose.addEventListener("click", () => helpPanel.classList.remove("open"));
+helpSendBtn.addEventListener("click", () => askHelp(helpInput.value));
+helpInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") askHelp(helpInput.value);
 });
 
 window.addEventListener("load", () => {
