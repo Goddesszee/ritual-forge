@@ -155,9 +155,7 @@ contract AutonomousCompany {
         if (running) revert AlreadyRunning();
         running = true;
         _fundWallet(SCHEDULER_FEE_DEPOSIT);
-        (bool ok, uint256 callId) = _scheduleWakeup(WAKE_INTERVAL);
-        require(ok, "initial schedule failed");
-        scheduleId = callId;
+        scheduleId = _scheduleWakeupOrRevert(WAKE_INTERVAL);
         emit CompanyStarted(block.number);
     }
 
@@ -168,9 +166,7 @@ contract AutonomousCompany {
 
     /// @notice Step 2 only, callable independently for isolated testing.
     function scheduleOnly() external onlyOwner returns (uint256) {
-        (bool ok, uint256 callId) = _scheduleWakeup(WAKE_INTERVAL);
-        require(ok, "schedule failed");
-        return callId;
+        return _scheduleWakeupOrRevert(WAKE_INTERVAL);
     }
 
     /// @notice Recovery valve. If a wake-up's self-reschedule ever fails
@@ -181,10 +177,8 @@ contract AutonomousCompany {
     function kick() external onlyOwner {
         if (!running) revert NotRunning();
         _fundWallet(SCHEDULER_FEE_DEPOSIT);
-        (bool ok, uint256 callId) = _scheduleWakeup(WAKE_INTERVAL);
-        require(ok, "kick: schedule still failing");
-        scheduleId = callId;
-        emit Kicked(callId, block.number);
+        scheduleId = _scheduleWakeupOrRevert(WAKE_INTERVAL);
+        emit Kicked(scheduleId, block.number);
     }
 
     /// @notice Deposits up to `amount` (capped by current balance) into
@@ -272,12 +266,37 @@ contract AutonomousCompany {
     }
 
     /// @notice Never reverts — returns success/failure instead so callers
-    ///         can decide how to react (start()/kick() require success,
-    ///         wakeUp() tolerates failure and recovers via kick()).
+    ///         can decide how to react. Used inside wakeUp(), where we
+    ///         want resilience over diagnostics (a failure here shouldn't
+    ///         nuke the heartbeat that already happened this cycle).
     function _scheduleWakeup(uint32 delay) internal returns (bool, uint256) {
+        (bool ok, bytes memory result) = _scheduleWakeupCall(delay);
+        if (!ok) {
+            return (false, 0);
+        }
+        return (true, abi.decode(result, (uint256)));
+    }
+
+    /// @notice Same call, but bubbles Scheduler's *actual* revert reason
+    ///         instead of swallowing it. Used by start()/kick(), where
+    ///         reverting the whole tx is already the intended behavior on
+    ///         failure — so we may as well surface the real cause (e.g.
+    ///         an insufficient-balance or bad-parameter error from the
+    ///         Scheduler contract itself) rather than a generic message.
+    function _scheduleWakeupOrRevert(uint32 delay) internal returns (uint256) {
+        (bool ok, bytes memory result) = _scheduleWakeupCall(delay);
+        if (!ok) {
+            assembly {
+                revert(add(result, 32), mload(result))
+            }
+        }
+        return abi.decode(result, (uint256));
+    }
+
+    function _scheduleWakeupCall(uint32 delay) private returns (bool, bytes memory) {
         bytes memory data = abi.encodeWithSelector(this.wakeUp.selector, uint256(0));
 
-        (bool ok, bytes memory result) = SCHEDULER.call(
+        return SCHEDULER.call(
             abi.encodeWithSelector(
                 IScheduler.schedule.selector,
                 data,
@@ -292,10 +311,6 @@ contract AutonomousCompany {
                 address(this)
             )
         );
-        if (!ok) {
-            return (false, 0);
-        }
-        return (true, abi.decode(result, (uint256)));
     }
 
     // ══════════════════════════════════════════════════════════
