@@ -238,6 +238,111 @@
     border:1.5px dashed var(--line);border-radius:12px;font-size:13.5px;
   }
 
+  /* ── Swap nav button ── */
+  .nav-swap-btn{
+    background:none;border:1px solid var(--line);color:var(--text);
+    padding:9px 16px;border-radius:8px;font-size:12.5px;font-weight:700;
+    cursor:pointer;font-family:'IBM Plex Mono',monospace;letter-spacing:0.01em;
+    transition:border-color 0.15s ease, color 0.15s ease;
+  }
+  .nav-swap-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+  /* ── Swap modal ── */
+  .modal-backdrop{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);
+    z-index:100;align-items:flex-start;justify-content:center;
+    padding:88px 20px 20px;overflow-y:auto;
+  }
+  .modal-backdrop.open{display:flex;}
+  .swap-modal{
+    background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    width:100%;max-width:420px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,0.35);
+  }
+  .swap-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .swap-modal-head h3{font-family:'Newsreader',serif;font-size:20px;font-weight:600;margin:0;}
+  .modal-close{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--muted);
+    width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:13px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .modal-close:hover{color:var(--text);border-color:var(--accent);}
+
+  /* ── Swap card ── */
+  .swap-card-wrap{
+    border:1px solid var(--line);border-radius:14px;padding:4px;
+    margin-bottom:12px;background:var(--bg);
+  }
+  .swap-tier{background:var(--panel-2);padding:14px 16px 12px;}
+  .swap-tier.top{border-radius:11px 11px 4px 4px;}
+  .swap-tier.bottom{border-radius:4px 4px 11px 11px;padding:12px 16px 14px;}
+  .swap-tier-label{
+    font-size:11.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;
+    letter-spacing:0.02em;margin-bottom:12px;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .swap-tier-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .token-pill{
+    display:flex;align-items:center;gap:8px;background:var(--panel);
+    border:1px solid var(--line);border-radius:100px;padding:6px 14px 6px 6px;
+    flex-shrink:0;
+  }
+  .token-icon{
+    width:24px;height:24px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--accent);color:var(--on-accent);
+  }
+  .token-icon svg{width:12px;height:12px;}
+  .token-pill span{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;letter-spacing:0.01em;}
+  .swap-amount-input{
+    flex:1;min-width:0;background:transparent;border:none;text-align:right;
+    font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:700;
+    color:var(--text);padding:0;margin:0;outline:none;
+  }
+  .swap-amount-input::placeholder{color:var(--muted);opacity:0.45;}
+  .swap-amount-input:read-only{color:var(--muted);}
+  .max-link{
+    color:var(--accent);cursor:pointer;font-weight:700;background:none;
+    border:none;padding:0 0 0 2px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;
+  }
+  .max-link:hover{text-decoration:underline;}
+  .swap-flip-wrap{display:flex;justify-content:center;margin:-14px 0;position:relative;z-index:2;}
+  .swap-flip-btn{
+    width:30px;height:30px;border-radius:50%;background:var(--panel);
+    border:3px solid var(--bg);color:var(--accent);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:13px;
+    transition:transform 0.2s ease;box-shadow:var(--shadow-sm);
+  }
+  .swap-flip-btn:hover{transform:rotate(180deg);}
+  .swap-rate-row{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    font-size:11.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;
+    padding:10px 4px;
+  }
+  .rate-refresh-btn{
+    background:none;border:none;color:var(--muted);cursor:pointer;
+    font-size:14px;line-height:1;padding:2px;flex-shrink:0;
+    transition:transform 0.3s ease, color 0.15s ease;
+  }
+  .rate-refresh-btn:hover{color:var(--accent);}
+  .rate-refresh-btn.spinning{animation:spin 0.6s linear;}
+  @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+  .pool-status-bar{
+    font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);
+    background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+    padding:8px 12px;margin-bottom:14px;display:flex;align-items:center;gap:6px;
+  }
+  .pool-status-bar::before{content:"●";font-size:9px;color:var(--muted);}
+  .pool-status-bar.ready::before{color:var(--good);}
+  .pool-status-bar.ready{color:var(--good);}
+  .pool-status-bar.empty::before{color:var(--bad);}
+  .pool-status-bar.empty{color:var(--bad);}
+  .faucet-link{
+    display:block;width:100%;text-align:center;background:none;border:none;
+    color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:11.5px;
+    cursor:pointer;padding:12px 0 0;
+  }
+  .faucet-link:hover{color:var(--accent);text-decoration:underline;}
+
   .status-line{font-size:12.5px;color:var(--muted);margin-top:14px;font-family:'IBM Plex Mono',monospace;min-height:16px;}
   .status-line.err{color:var(--bad);}
   .status-line.ok{color:var(--good);}
@@ -277,6 +382,7 @@
     </div>
   </div>
   <div class="header-right">
+    <button class="nav-swap-btn" id="openSwapBtn">Swap</button>
     <span class="ritual-badge" title="Ritual Chain testnet 1979">
       <span>Ritual testnet</span>
     </span>
@@ -284,6 +390,61 @@
     <button class="wallet-btn" id="connectBtn">Connect wallet</button>
   </div>
 </header>
+
+<div class="modal-backdrop" id="swapModalBackdrop">
+  <div class="swap-modal">
+    <div class="swap-modal-head">
+      <h3>Swap</h3>
+      <button class="modal-close" id="swapModalClose" aria-label="Close">✕</button>
+    </div>
+
+    <div class="swap-card-wrap">
+      <div class="swap-tier top">
+        <div class="swap-tier-label">
+          <span>Sell</span>
+          <span>Bal: <span id="fromBalLabel">–</span> <button class="max-link" id="maxBtn" type="button">MAX</button></span>
+        </div>
+        <div class="swap-tier-row">
+          <div class="token-pill" id="fromTokenPill">
+            <span class="token-icon" id="fromTokenIcon"></span>
+            <span id="fromTokenSymbol">RITUAL</span>
+          </div>
+          <input class="swap-amount-input" id="swapAmountIn" type="number" step="0.0001" placeholder="0" />
+        </div>
+      </div>
+
+      <div class="swap-flip-wrap">
+        <button class="swap-flip-btn" id="swapDirBtn" type="button" title="Flip direction">⇅</button>
+      </div>
+
+      <div class="swap-tier bottom">
+        <div class="swap-tier-label">
+          <span>Buy</span>
+          <span>Bal: <span id="toBalLabel">–</span></span>
+        </div>
+        <div class="swap-tier-row">
+          <div class="token-pill" id="toTokenPill">
+            <span class="token-icon" id="toTokenIcon"></span>
+            <span id="toTokenSymbol">FORGE</span>
+          </div>
+          <input class="swap-amount-input" id="swapAmountOut" placeholder="0" readonly />
+        </div>
+      </div>
+    </div>
+
+    <div class="swap-rate-row">
+      <span id="swapQuote">Enter an amount to see a rate.</span>
+      <button class="rate-refresh-btn" id="rateRefreshBtn" title="Refresh rate" type="button">⟳</button>
+    </div>
+
+    <div class="pool-status-bar" id="poolStatusBar">checking pool…</div>
+
+    <button class="btn" id="swapBtn" style="width:100%;"><span class="spinner"></span><span class="btn-label">Swap</span></button>
+
+    <button class="faucet-link" id="forgeFaucetBtn" type="button">Need FORGE? Claim from faucet · 100/hr</button>
+    <div class="status-line" id="swapStatus"></div>
+  </div>
+</div>
 
 <main>
 
@@ -309,19 +470,6 @@
     <input id="initialFunding" type="number" step="0.001" value="0.05" />
     <button class="btn" id="deployBtn"><span class="spinner"></span><span class="btn-label">Forge company</span></button>
     <div class="status-line" id="deployStatus"></div>
-  </div>
-
-  <div class="panel">
-    <h3>Swap <span class="mono">RITUAL</span> ⇄ <span class="mono">FORGE</span></h3>
-    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-      <button class="btn small-btn" id="swapDirBtn" type="button">RITUAL → FORGE</button>
-      <button class="btn small-btn" id="forgeFaucetBtn" type="button" style="background:var(--panel-2);color:var(--accent);border:1px solid var(--line);">Claim FORGE faucet</button>
-    </div>
-    <label id="swapInLabel">You pay (RITUAL)</label>
-    <input id="swapAmountIn" type="number" step="0.0001" placeholder="0.1" />
-    <div class="status-line" id="swapQuote">Enter an amount to see a quote.</div>
-    <button class="btn" id="swapBtn" style="margin-top:12px;"><span class="spinner"></span><span class="btn-label">Swap</span></button>
-    <div class="status-line" id="swapStatus"></div>
   </div>
 
   <div class="panel">
@@ -391,8 +539,6 @@ const SWAP_ABI = [
 ];
 
 let provider, signer, userAddress;
-let swapDirection = "r2f"; // "r2f" = RITUAL -> FORGE, "f2r" = FORGE -> RITUAL
-let lastQuoteOutWei = 0n;
 
 // ---- animated wireframe background ----
 (function initBackground() {
@@ -505,6 +651,8 @@ async function connectWallet() {
     btn.textContent = userAddress.slice(0, 6) + "…" + userAddress.slice(-4);
     btn.classList.add("connected");
     loadCompanies();
+    refreshBalances();
+    refreshPoolStatus();
   } catch (e) {
     console.error(e);
   }
@@ -781,35 +929,164 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ---- swap panel ----
+// ---- swap modal ----
+const TOKEN_ICON_SVG = {
+  RITUAL: '<svg viewBox="0 0 24 24"><polygon points="12,3 21,12 12,21 3,12" fill="none" stroke="currentColor" stroke-width="2.8"/></svg>',
+  FORGE: '<svg viewBox="0 0 24 24"><polygon points="12,3 21,12 12,21 3,12" fill="currentColor"/></svg>'
+};
+
+let fromToken = "RITUAL"; // "RITUAL" | "FORGE" — toToken is always the other one
+let lastQuoteOutWei = 0n;
+
+const openSwapBtn = document.getElementById("openSwapBtn");
+const swapModalBackdrop = document.getElementById("swapModalBackdrop");
+const swapModalClose = document.getElementById("swapModalClose");
 const swapDirBtn = document.getElementById("swapDirBtn");
-const swapInLabel = document.getElementById("swapInLabel");
+const fromTokenIcon = document.getElementById("fromTokenIcon");
+const fromTokenSymbol = document.getElementById("fromTokenSymbol");
+const toTokenIcon = document.getElementById("toTokenIcon");
+const toTokenSymbol = document.getElementById("toTokenSymbol");
+const fromBalLabel = document.getElementById("fromBalLabel");
+const toBalLabel = document.getElementById("toBalLabel");
 const swapAmountIn = document.getElementById("swapAmountIn");
+const swapAmountOut = document.getElementById("swapAmountOut");
 const swapQuote = document.getElementById("swapQuote");
+const rateRefreshBtn = document.getElementById("rateRefreshBtn");
+const poolStatusBar = document.getElementById("poolStatusBar");
 const swapBtn = document.getElementById("swapBtn");
 const swapBtnLabel = swapBtn.querySelector(".btn-label");
 const swapStatus = document.getElementById("swapStatus");
 const forgeFaucetBtn = document.getElementById("forgeFaucetBtn");
+const maxBtn = document.getElementById("maxBtn");
+
+function toToken() {
+  return fromToken === "RITUAL" ? "FORGE" : "RITUAL";
+}
+
+function openSwapModal() {
+  swapModalBackdrop.classList.add("open");
+  refreshBalances();
+  refreshPoolStatus();
+}
+function closeSwapModal() {
+  swapModalBackdrop.classList.remove("open");
+}
+openSwapBtn.addEventListener("click", openSwapModal);
+swapModalClose.addEventListener("click", closeSwapModal);
+swapModalBackdrop.addEventListener("click", (e) => {
+  if (e.target === swapModalBackdrop) closeSwapModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && swapModalBackdrop.classList.contains("open")) closeSwapModal();
+});
+
+function renderTokenPills() {
+  const t = toToken();
+  fromTokenIcon.innerHTML = TOKEN_ICON_SVG[fromToken];
+  fromTokenSymbol.textContent = fromToken;
+  toTokenIcon.innerHTML = TOKEN_ICON_SVG[t];
+  toTokenSymbol.textContent = t;
+  swapBtnLabel.textContent = "Swap " + fromToken + " ↔ " + t;
+}
+renderTokenPills();
+
+async function refreshBalances() {
+  if (!provider) {
+    try { provider = new ethers.BrowserProvider(window.ethereum, "any"); } catch (e) { return; }
+  }
+  if (!userAddress) {
+    fromBalLabel.textContent = "–";
+    toBalLabel.textContent = "–";
+    return;
+  }
+  try {
+    const [ritualBal, forgeBal] = await Promise.all([
+      provider.getBalance(userAddress),
+      CONFIG.forgeTokenAddress
+        ? new ethers.Contract(CONFIG.forgeTokenAddress, FORGE_TOKEN_ABI, provider).balanceOf(userAddress)
+        : Promise.resolve(0n),
+    ]);
+    const balances = { RITUAL: ritualBal, FORGE: forgeBal };
+    fromBalLabel.textContent = Number(ethers.formatEther(balances[fromToken])).toFixed(4);
+    toBalLabel.textContent = Number(ethers.formatEther(balances[toToken()])).toFixed(4);
+  } catch (e) {
+    console.error("balance refresh failed", e);
+  }
+}
+
+async function refreshPoolStatus() {
+  if (!CONFIG.swapAddress) {
+    poolStatusBar.textContent = "Swap pool not deployed yet.";
+    poolStatusBar.className = "pool-status-bar";
+    return;
+  }
+  try {
+    if (!provider) provider = new ethers.BrowserProvider(window.ethereum, "any");
+    const swap = new ethers.Contract(CONFIG.swapAddress, SWAP_ABI, provider);
+    const [r, f] = await swap.getReserves();
+    if (r === 0n || f === 0n) {
+      poolStatusBar.textContent = "Pool empty — swaps may fail";
+      poolStatusBar.className = "pool-status-bar empty";
+    } else {
+      poolStatusBar.textContent = "Pool healthy · " + Number(ethers.formatEther(r)).toFixed(2) + " RITUAL / " + Number(ethers.formatEther(f)).toFixed(2) + " FORGE";
+      poolStatusBar.className = "pool-status-bar ready";
+    }
+  } catch (e) {
+    poolStatusBar.textContent = "Checking pool…";
+    poolStatusBar.className = "pool-status-bar";
+  }
+}
 
 swapDirBtn.addEventListener("click", () => {
-  swapDirection = swapDirection === "r2f" ? "f2r" : "r2f";
-  swapDirBtn.textContent = swapDirection === "r2f" ? "RITUAL → FORGE" : "FORGE → RITUAL";
-  swapInLabel.textContent = swapDirection === "r2f" ? "You pay (RITUAL)" : "You pay (FORGE)";
+  fromToken = toToken();
+  renderTokenPills();
   swapAmountIn.value = "";
-  swapQuote.textContent = "Enter an amount to see a quote.";
+  swapAmountOut.value = "";
+  swapQuote.textContent = "Enter an amount to see a rate.";
   lastQuoteOutWei = 0n;
+  refreshBalances();
+});
+
+maxBtn.addEventListener("click", async () => {
+  if (!userAddress) return;
+  await refreshBalances();
+  try {
+    if (fromToken === "RITUAL") {
+      const bal = await provider.getBalance(userAddress);
+      // Leave a small buffer for gas rather than sending the exact balance.
+      const buffer = ethers.parseEther("0.002");
+      const usable = bal > buffer ? bal - buffer : 0n;
+      swapAmountIn.value = ethers.formatEther(usable);
+    } else if (CONFIG.forgeTokenAddress) {
+      const forge = new ethers.Contract(CONFIG.forgeTokenAddress, FORGE_TOKEN_ABI, provider);
+      const bal = await forge.balanceOf(userAddress);
+      swapAmountIn.value = ethers.formatEther(bal);
+    }
+    updateSwapQuote();
+  } catch (e) {
+    console.error("max failed", e);
+  }
 });
 
 swapAmountIn.addEventListener("input", updateSwapQuote);
+rateRefreshBtn.addEventListener("click", () => {
+  rateRefreshBtn.classList.remove("spinning");
+  void rateRefreshBtn.offsetWidth; // restart animation
+  rateRefreshBtn.classList.add("spinning");
+  updateSwapQuote();
+  refreshPoolStatus();
+});
 
 async function updateSwapQuote() {
   if (!CONFIG.swapAddress) {
     swapQuote.textContent = "Swap pool not deployed yet.";
+    swapAmountOut.value = "";
     return;
   }
   const val = swapAmountIn.value;
   if (!val || Number(val) <= 0) {
-    swapQuote.textContent = "Enter an amount to see a quote.";
+    swapQuote.textContent = "Enter an amount to see a rate.";
+    swapAmountOut.value = "";
     lastQuoteOutWei = 0n;
     return;
   }
@@ -817,19 +1094,18 @@ async function updateSwapQuote() {
     if (!provider) provider = new ethers.BrowserProvider(window.ethereum, "any");
     const swap = new ethers.Contract(CONFIG.swapAddress, SWAP_ABI, provider);
     const amountWei = ethers.parseEther(val);
-    if (swapDirection === "r2f") {
-      const out = await swap.quoteRitualToForge(amountWei);
-      lastQuoteOutWei = out;
-      swapQuote.textContent = "≈ " + Number(ethers.formatEther(out)).toFixed(4) + " FORGE";
-    } else {
-      const out = await swap.quoteForgeToRitual(amountWei);
-      lastQuoteOutWei = out;
-      swapQuote.textContent = "≈ " + Number(ethers.formatEther(out)).toFixed(6) + " RITUAL";
-    }
+    const out = fromToken === "RITUAL"
+      ? await swap.quoteRitualToForge(amountWei)
+      : await swap.quoteForgeToRitual(amountWei);
+    lastQuoteOutWei = out;
+    const outFormatted = Number(ethers.formatEther(out));
+    swapAmountOut.value = outFormatted.toFixed(4);
+    swapQuote.textContent = "1 " + fromToken + " ≈ " + (outFormatted / Number(val)).toFixed(4) + " " + toToken();
   } catch (e) {
     console.error(e);
     lastQuoteOutWei = 0n;
-    swapQuote.textContent = "Could not fetch a quote (pool may not have liquidity yet).";
+    swapAmountOut.value = "";
+    swapQuote.textContent = "Could not fetch a rate (pool may not have liquidity yet).";
   }
 }
 
@@ -845,6 +1121,7 @@ forgeFaucetBtn.addEventListener("click", async () => {
     await waitForReceipt(tx.hash);
     swapStatus.textContent = "Claimed 100 FORGE.";
     swapStatus.className = "status-line ok";
+    refreshBalances();
   } catch (e) {
     console.error(e);
     swapStatus.textContent = "Faucet claim failed: " + (e.shortMessage || e.message || "unknown error");
@@ -868,6 +1145,8 @@ swapBtn.addEventListener("click", async () => {
   // cached yet (e.g. quote fetch failed), fall back to accepting any
   // output rather than blocking the swap outright.
   const minOut = lastQuoteOutWei > 0n ? (lastQuoteOutWei * 95n) / 100n : 0n;
+  const activeFrom = fromToken;
+  const activeTo = toToken();
 
   try {
     swapBtn.disabled = true;
@@ -876,7 +1155,7 @@ swapBtn.addEventListener("click", async () => {
     const amountWei = ethers.parseEther(val);
     const swap = new ethers.Contract(CONFIG.swapAddress, SWAP_ABI, signer);
 
-    if (swapDirection === "r2f") {
+    if (activeFrom === "RITUAL") {
       swapStatus.textContent = "Confirm the swap in your wallet.";
       swapStatus.className = "status-line";
       const tx = await swap.swapRitualForForge(minOut, { value: amountWei });
@@ -899,8 +1178,11 @@ swapBtn.addEventListener("click", async () => {
     swapStatus.textContent = "Swap complete.";
     swapStatus.className = "status-line ok";
     swapAmountIn.value = "";
-    swapQuote.textContent = "Enter an amount to see a quote.";
+    swapAmountOut.value = "";
+    swapQuote.textContent = "Enter an amount to see a rate.";
     lastQuoteOutWei = 0n;
+    refreshBalances();
+    refreshPoolStatus();
   } catch (e) {
     console.error(e);
     swapStatus.textContent = "Swap failed: " + (e.shortMessage || e.message || "unknown error");
@@ -908,15 +1190,13 @@ swapBtn.addEventListener("click", async () => {
   } finally {
     swapBtn.disabled = false;
     swapBtn.classList.remove("loading");
-    swapBtnLabel.textContent = "Swap";
+    swapBtnLabel.textContent = "Swap " + activeFrom + " ↔ " + activeTo;
   }
 });
 
 window.addEventListener("load", () => {
   loadCompanies();
-  if (!CONFIG.swapAddress) {
-    swapQuote.textContent = "Swap pool not deployed yet.";
-  }
+  refreshPoolStatus();
 });
 </script>
 </body>
