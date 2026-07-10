@@ -354,65 +354,68 @@
   }
   .help-fab:hover{transform:scale(1.06);}
   .help-fab svg{width:24px;height:24px;}
-  .help-panel{
-    position:fixed;bottom:96px;right:24px;z-index:91;
-    width:420px;max-width:calc(100vw - 32px);
-    height:min(680px, calc(100vh - 130px));
-    background:var(--panel);border:1px solid var(--line);border-radius:18px;
-    box-shadow:0 24px 64px rgba(0,0,0,0.4);
-    display:none;flex-direction:column;overflow:hidden;
+  .help-backdrop{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);
+    z-index:100;align-items:center;justify-content:center;padding:24px;
   }
-  .help-panel.open{display:flex;}
+  .help-backdrop.open{display:flex;}
+  .help-panel{
+    width:640px;max-width:100%;
+    height:min(760px, calc(100vh - 48px));
+    background:var(--panel);border:1px solid var(--line);border-radius:18px;
+    box-shadow:0 32px 80px rgba(0,0,0,0.5);
+    display:flex;flex-direction:column;overflow:hidden;
+  }
   .help-panel-head{
-    padding:18px 20px;border-bottom:1px solid var(--line);
+    padding:22px 26px;border-bottom:1px solid var(--line);
     display:flex;align-items:center;justify-content:space-between;
     background:var(--panel-2);flex-shrink:0;
   }
-  .help-panel-head h4{margin:0;font-family:'Newsreader',serif;font-size:19px;font-weight:600;}
-  .help-panel-head p{margin:4px 0 0;font-size:11.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+  .help-panel-head h4{margin:0;font-family:'Newsreader',serif;font-size:24px;font-weight:600;}
+  .help-panel-head p{margin:5px 0 0;font-size:12.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
   .help-close{
-    background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;
-    width:30px;height:30px;border-radius:50%;flex-shrink:0;
+    background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;
+    width:34px;height:34px;border-radius:50%;flex-shrink:0;
   }
   .help-close:hover{color:var(--text);background:var(--panel);}
   .help-topics{
-    display:flex;flex-wrap:wrap;gap:8px;padding:14px 20px;
+    display:flex;flex-wrap:wrap;gap:9px;padding:18px 26px;
     border-bottom:1px solid var(--line);flex-shrink:0;
   }
   .help-topic-btn{
     background:var(--panel-2);border:1px solid var(--line);color:var(--text);
-    border-radius:100px;padding:7px 14px;font-size:12px;cursor:pointer;
+    border-radius:100px;padding:8px 16px;font-size:13px;cursor:pointer;
     font-family:'IBM Plex Mono',monospace;transition:border-color 0.15s ease, color 0.15s ease;
   }
   .help-topic-btn:hover{border-color:var(--accent);color:var(--accent);}
   .help-messages{
-    flex:1;overflow-y:auto;padding:20px;
-    display:flex;flex-direction:column;gap:16px;
+    flex:1;overflow-y:auto;padding:26px;
+    display:flex;flex-direction:column;gap:18px;
     scroll-behavior:smooth;
   }
-  .help-msg{font-size:14px;line-height:1.65;max-width:90%;padding:12px 15px;border-radius:12px;}
+  .help-msg{font-size:15px;line-height:1.7;max-width:82%;padding:14px 18px;border-radius:14px;}
   .help-msg.bot{background:var(--panel-2);color:var(--text);align-self:flex-start;border-bottom-left-radius:4px;}
-  .help-msg.user{background:var(--accent);color:var(--on-accent);align-self:flex-end;border-bottom-right-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:13px;}
+  .help-msg.user{background:var(--accent);color:var(--on-accent);align-self:flex-end;border-bottom-right-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:14px;}
   .help-input-row{
-    display:flex;gap:10px;padding:16px 20px;border-top:1px solid var(--line);flex-shrink:0;
+    display:flex;gap:12px;padding:20px 26px;border-top:1px solid var(--line);flex-shrink:0;
   }
   .help-input-row input{
     flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;
-    padding:12px 14px;font-size:13.5px;color:var(--text);outline:none;
+    padding:14px 16px;font-size:14.5px;color:var(--text);outline:none;
     font-family:inherit;
   }
   .help-input-row input:focus{border-color:var(--accent);}
   .help-send-btn{
     background:var(--accent);color:var(--on-accent);border:none;border-radius:10px;
-    padding:0 18px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;
+    padding:0 22px;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;
     font-family:'IBM Plex Mono',monospace;
   }
   .help-send-btn:hover{filter:brightness(1.1);}
   .help-send-btn:disabled{opacity:0.5;cursor:default;}
-  @media(max-width:480px){
+  @media(max-width:600px){
+    .help-backdrop{padding:0;}
     .help-panel{
-      right:12px;left:12px;bottom:12px;top:12px;
-      width:auto;height:auto;max-width:none;
+      width:100%;height:100%;border-radius:0;
     }
     .help-fab{right:16px;bottom:16px;}
   }
@@ -560,19 +563,21 @@
   </svg>
 </button>
 
-<div class="help-panel" id="helpPanel">
-  <div class="help-panel-head">
-    <div>
-      <h4>Ask Forge</h4>
-      <p>Ask about deploying, wake cycles, swap, and more</p>
+<div class="help-backdrop" id="helpBackdrop">
+  <div class="help-panel" id="helpPanel">
+    <div class="help-panel-head">
+      <div>
+        <h4>Ask Forge</h4>
+        <p>Ask about deploying, wake cycles, swap, and more</p>
+      </div>
+      <button class="help-close" id="helpClose" aria-label="Close">✕</button>
     </div>
-    <button class="help-close" id="helpClose" aria-label="Close">✕</button>
-  </div>
-  <div class="help-topics" id="helpTopics"></div>
-  <div class="help-messages" id="helpMessages"></div>
-  <div class="help-input-row">
-    <input id="helpInput" type="text" placeholder="Ask a question…" />
-    <button class="help-send-btn" id="helpSendBtn">Ask</button>
+    <div class="help-topics" id="helpTopics"></div>
+    <div class="help-messages" id="helpMessages"></div>
+    <div class="help-input-row">
+      <input id="helpInput" type="text" placeholder="Ask a question…" />
+      <button class="help-send-btn" id="helpSendBtn">Ask</button>
+    </div>
   </div>
 </div>
 
@@ -1354,6 +1359,7 @@ const HELP_TOPICS_SHOWN = [
 ];
 
 const helpFab = document.getElementById("helpFab");
+const helpBackdrop = document.getElementById("helpBackdrop");
 const helpPanel = document.getElementById("helpPanel");
 const helpClose = document.getElementById("helpClose");
 const helpMessages = document.getElementById("helpMessages");
@@ -1443,13 +1449,19 @@ async function askHelp(text) {
 }
 
 helpFab.addEventListener("click", () => {
-  helpPanel.classList.toggle("open");
-  if (helpPanel.classList.contains("open") && helpMessages.children.length === 0) {
+  helpBackdrop.classList.toggle("open");
+  if (helpBackdrop.classList.contains("open") && helpMessages.children.length === 0) {
     addHelpMessage("Hey — ask me anything about how Forge works. If the AI backend isn't reachable I'll fall back to a scripted FAQ automatically.", "bot");
     renderHelpTopics();
   }
 });
-helpClose.addEventListener("click", () => helpPanel.classList.remove("open"));
+helpClose.addEventListener("click", () => helpBackdrop.classList.remove("open"));
+helpBackdrop.addEventListener("click", (e) => {
+  if (e.target === helpBackdrop) helpBackdrop.classList.remove("open");
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && helpBackdrop.classList.contains("open")) helpBackdrop.classList.remove("open");
+});
 helpSendBtn.addEventListener("click", () => askHelp(helpInput.value));
 helpInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") askHelp(helpInput.value);
