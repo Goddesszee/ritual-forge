@@ -296,17 +296,25 @@ contract AutonomousCompany {
     function _scheduleWakeupCall(uint32 delay) private returns (bool, bytes memory) {
         bytes memory data = abi.encodeWithSelector(this.wakeUp.selector, uint256(0));
 
+        // Values match Ritual's own official "AutonomousAgent" reference
+        // implementation (docs.ritualfoundation.org — "How They Stay Alive")
+        // exactly: gas 800_000, numCalls 3 ("retry slots" — not a literal
+        // repeat count, Scheduler's own retry attempts for this one logical
+        // wake), frequency 1, ttl 30, maxFeePerGas 20 gwei, maxPriorityFeePerGas
+        // 2 gwei. Our earlier numCalls=1 and dynamic-basefee fee values were
+        // a guess that produced the exact 0x13a6fe64 revert seen in
+        // production — these are the values from Ritual's own working example.
         return SCHEDULER.call(
             abi.encodeWithSelector(
                 IScheduler.schedule.selector,
                 data,
-                uint32(300000),
+                uint32(800000),
                 uint32(block.number) + delay,
+                uint32(3),
                 uint32(1),
-                uint32(1),
-                uint32(100),
-                block.basefee + 1 gwei,
-                uint256(0),
+                uint32(30),
+                uint256(20 gwei),
+                uint256(2 gwei),
                 uint256(0),
                 address(this)
             )
