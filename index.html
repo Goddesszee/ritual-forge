@@ -603,11 +603,12 @@ const CONFIG = {
   rpcUrl: "https://rpc.ritualfoundation.org",
   chainName: "Ritual Chain Testnet",
   explorer: "https://explorer.ritualfoundation.org",
-  factoryAddress: "0x946760A18F15c6a816F971f77C0B0985c672f6Bb",
-  // Redeployed 2026-07-10 with the debug fix that bubbles the real
-  // Scheduler revert reason in start()/kick() instead of a generic message.
-  forgeTokenAddress: "0x1936B0Fa5CEA91C6D760d0d5846f3c4b73CF6Cf4",
-  swapAddress: "0xaAD258E8d77bDf094f4B17e1842AC4B90De02737",
+  factoryAddress: "0xAb502250737bf8a42517a6a5E1961237f3d5Ec43",
+  // Redeployed 2026-07-10 with scheduler params matching Ritual's own
+  // official "AutonomousAgent" reference example exactly (numCalls=3,
+  // fixed 20/2 gwei fees) instead of the earlier guessed values.
+  forgeTokenAddress: "0xe1FB91836655308335760DD51f71B151fE5D5e07",
+  swapAddress: "0x39E2FC2adF5350CdA65a1a64Dd42A9CAbCD8c7C5",
 };
 
 const FACTORY_ABI = [
