@@ -1026,7 +1026,10 @@ async function startCompany(addr, card) {
   } catch (e) {
     console.error(e);
     btn.disabled = false;
-    statusEl.textContent = "Start failed: " + (e.shortMessage || e.message || "unknown error");
+    const rawData = e.data || e.info?.error?.data || e.error?.data || (e.revert ? JSON.stringify(e.revert) : null);
+    let msg = "Start failed: " + (e.shortMessage || e.message || "unknown error");
+    if (rawData) msg += " — raw: " + rawData;
+    statusEl.textContent = msg;
     statusEl.className = "status-line err";
   }
 }
