@@ -603,10 +603,11 @@ const CONFIG = {
   rpcUrl: "https://rpc.ritualfoundation.org",
   chainName: "Ritual Chain Testnet",
   explorer: "https://explorer.ritualfoundation.org",
-  factoryAddress: "0xffaFBc0402f5b5e7e08EBD9d9Ac36bAaabE44190",
-  // Deployed 2026-07-09 from the fix/scheduler-signature + feature/forge-token-swap code.
-  forgeTokenAddress: "0x94f863474674875F5B90a5a6b6a08F6F773E1917",
-  swapAddress: "0x1313dff5d479B50A2544b2bb5e9fd64A6e735eE8",
+  factoryAddress: "0x946760A18F15c6a816F971f77C0B0985c672f6Bb",
+  // Redeployed 2026-07-10 with the debug fix that bubbles the real
+  // Scheduler revert reason in start()/kick() instead of a generic message.
+  forgeTokenAddress: "0x1936B0Fa5CEA91C6D760d0d5846f3c4b73CF6Cf4",
+  swapAddress: "0xaAD258E8d77bDf094f4B17e1842AC4B90De02737",
 };
 
 const FACTORY_ABI = [
