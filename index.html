@@ -975,7 +975,13 @@ async function requestService(addr, card, fee) {
     statusEl.textContent = "Confirm the payment in your wallet.";
     statusEl.className = "status-line";
     const company = new ethers.Contract(addr, COMPANY_ABI, signer);
-    const tx = await company.requestService(inputValue, { value: fee });
+    // Manual gas limit rather than automatic estimation: the LLM precompile's
+    // real on-chain execution cost can exceed what a quick eth_call-based
+    // estimate predicts (TEE attestation overhead isn't fully visible to a
+    // simulation), and an out-of-gas partway through isn't always something
+    // our contract's try/catch can recover from. Generous fixed limit costs
+    // nothing extra on testnet — unused gas is refunded.
+    const tx = await company.requestService(inputValue, { value: fee, gasLimit: 3000000n });
     statusEl.textContent = "Paid. Waiting for the LLM response.";
     const receipt = await waitForReceipt(tx.hash);
     if (receipt.status !== "0x1") {
