@@ -29,6 +29,21 @@ How Forge works, for context when answering questions:
   testnet RITUAL against a demo token called FORGE, via a simple
   constant-product AMM pool (0.3% fee). Users can also claim 100 FORGE
   per hour for free from a faucet button in that modal.
+- There's also a "Deploy a DCA Bot" section: anyone can deploy their own
+  self-scheduling agent that automatically swaps a fixed amount of RITUAL
+  into FORGE every wake cycle via the swap pool. Unlike companies, DCA
+  bots don't use the LLM precompile at all — they only rely on Scheduler
+  and the swap contract, so they keep working even when Ritual's TEE
+  executor network is degraded. Same Start/Kick/Stop/Withdraw controls
+  as companies, restricted to whoever deployed that specific bot.
+- Known current limitation: Ritual's testnet TEE executor network has
+  had periods with zero healthy registered executors, which makes
+  LLM-dependent features (company requestService, company heartbeats)
+  fail with a "failed to get cert hash from registry" error. This is a
+  Ritual infrastructure issue, not a bug in this app — if a user reports
+  that error, explain it's a known executor availability issue on
+  Ritual's end, not something wrong with their setup, and suggest trying
+  again later or using the DCA Bot instead, since it's unaffected.
 - Everything is on Ritual Chain testnet — tokens have no real value,
   this is for testing only.
 
