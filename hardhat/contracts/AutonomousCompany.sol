@@ -332,11 +332,11 @@ contract AutonomousCompany {
     //  LLM — real 30-field precompile call per ritual-dapp-llm skill
     // ══════════════════════════════════════════════════════════
 
-    function _getExecutor() internal view returns (address) {
+    function _getExecutors() internal view returns (ITEEServiceRegistry.TEEService[] memory) {
         ITEEServiceRegistry.TEEService[] memory services =
             ITEEServiceRegistry(TEE_REGISTRY).getServicesByCapability(CAPABILITY_LLM, true);
         if (services.length == 0) revert NoExecutorAvailable();
-        return services[0].node.teeAddress;
+        return services;
     }
 
     function _callLLM(string memory sysPrompt, string memory userContent, uint256 maxTokens)
@@ -344,7 +344,6 @@ contract AutonomousCompany {
         returns (bool hasError, string memory content, string memory errorMessage)
     {
         if (msg.sender != address(this)) revert OnlyOwner();
-        address executor = _getExecutor();
 
         string memory messagesJson = string(
             abi.encodePacked(
@@ -353,6 +352,33 @@ contract AutonomousCompany {
             )
         );
 
+        // Try every registered executor in order rather than only ever the
+        // first one. A single executor with a stale/expired TEE attestation
+        // (the builder rejects results from those — see docs on
+        // TEEServiceRegistry) would otherwise permanently break every call
+        // this contract makes, even while other executors and other agents
+        // on the network are working fine. This is exactly the failure
+        // pattern observed in production: "failed to get cert hash from
+        // registry" on every attempt, while Scheduler itself stayed active
+        // for other addresses the whole time.
+        ITEEServiceRegistry.TEEService[] memory services = _getExecutors();
+        for (uint256 i = 0; i < services.length; i++) {
+            (bool ok, bool hadError, string memory outContent, string memory outError) =
+                _tryLLMCall(services[i].node.teeAddress, messagesJson, maxTokens);
+            if (ok) {
+                return (hadError, outContent, outError);
+            }
+            // this executor failed outright (not just "model returned an
+            // error" — the precompile call itself didn't succeed) — move
+            // on and try the next registered executor.
+        }
+        return (true, "", "All registered executors failed (last resort: registry may be degraded)");
+    }
+
+    function _tryLLMCall(address executor, string memory messagesJson, uint256 maxTokens)
+        internal
+        returns (bool callOk, bool hasError, string memory content, string memory errorMessage)
+    {
         bytes memory input = abi.encode(
             executor,
             new bytes[](0),      // encryptedSecrets
@@ -389,10 +415,16 @@ contract AutonomousCompany {
 
         (bool ok, bytes memory result) = LLM.call(input);
         if (!ok) {
-            return (true, "", "LLM precompile call failed");
+            return (false, true, "", "LLM precompile call failed");
         }
 
         (, bytes memory actualOutput) = abi.decode(result, (bytes, bytes));
+
+        // The precompile call itself succeeded from here on — callOk stays
+        // true even if the model run itself reports an error, since that's
+        // a different kind of failure than "couldn't reach an executor at
+        // all" and shouldn't trigger trying the next executor in the list.
+        callOk = true;
 
         bytes memory completionData;
         (hasError, completionData, , errorMessage, ) = abi.decode(
@@ -400,7 +432,7 @@ contract AutonomousCompany {
         );
 
         if (hasError || completionData.length == 0) {
-            return (hasError, "", errorMessage);
+            return (callOk, hasError, "", errorMessage);
         }
 
         content = _extractContent(completionData);
