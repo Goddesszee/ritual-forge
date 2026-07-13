@@ -604,14 +604,14 @@ const CONFIG = {
   rpcUrl: "https://rpc.ritualfoundation.org",
   chainName: "Ritual Chain Testnet",
   explorer: "https://explorer.ritualfoundation.org",
-  factoryAddress: "0x2b5AD9eBC59BAF2d722410c53ebb3c5d095Cc039",
-  // Redeployed 2026-07-13 with executor fallback: _callLLM now tries
-  // every registered TEEServiceRegistry executor in turn instead of only
-  // ever services[0], since a single stale-attestation executor could
-  // permanently break every call (matched the "failed to get cert hash
-  // from registry" failures seen in production).
-  forgeTokenAddress: "0x70EAEef2e7332889e889340C3e91a1090A410B50",
-  swapAddress: "0x819F3d7E3fF78DcC37F345DBFc30237C1Ff845b4",
+  factoryAddress: "0xe6D68C594050A1b88A3B9301F4a7A6A5dB37B58d",
+  // Redeployed 2026-07-13 with the CORRECTED executor fallback: now also
+  // advances to the next executor when the model call succeeds at the EVM
+  // level but reports an internal error (e.g. cert-hash-from-registry
+  // failures), not just on an outright reverted call. Prior version only
+  // checked for the latter and never actually reached executor #2.
+  forgeTokenAddress: "0xD138Db50B091a0Fa639114CF37757551fbdAFa90",
+  swapAddress: "0xE77408fA0292a164AC270d54C1d669314AA6EC50",
 };
 
 const FACTORY_ABI = [
