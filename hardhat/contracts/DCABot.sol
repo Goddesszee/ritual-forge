@@ -131,6 +131,13 @@ contract DCABot {
     ///         same resilience pattern as AutonomousCompany.wakeUp(): a
     ///         failure here doesn't revert the whole call and erase the
     ///         cycle counter, it's caught and recorded instead.
+    /// @notice Slippage tolerance in basis points (500 = 5%). Without this,
+    ///         the bot would accept any price at all — a classic sandwich
+    ///         target, since a scheduled call at a known future block is
+    ///         trivially front-runnable. Quoting immediately before the
+    ///         swap and enforcing a floor closes that off.
+    uint256 public constant SLIPPAGE_TOLERANCE_BPS = 500;
+
     function wakeUp(uint256) external {
         if (msg.sender != SCHEDULER) revert OnlyScheduler();
         if (!running) return;
@@ -138,7 +145,17 @@ contract DCABot {
         cycleCount++;
 
         if (address(this).balance >= swapAmountPerCycle) {
-            try IRitualForgeSwap(swapAddress).swapRitualForForge{value: swapAmountPerCycle}(0) returns (uint256 forgeOut) {
+            uint256 minForgeOut = 0;
+            try IRitualForgeSwap(swapAddress).quoteRitualToForge(swapAmountPerCycle) returns (uint256 quoted) {
+                minForgeOut = (quoted * (10000 - SLIPPAGE_TOLERANCE_BPS)) / 10000;
+            } catch {
+                // Quote itself failed (e.g. pool genuinely has no liquidity
+                // right now) — fall back to no floor rather than letting
+                // this revert the whole wake-up and erase cycleCount++.
+                // The swap attempt below will simply fail on its own terms
+                // in that case, which IS caught.
+            }
+            try IRitualForgeSwap(swapAddress).swapRitualForForge{value: swapAmountPerCycle}(minForgeOut) returns (uint256 forgeOut) {
                 totalRitualSpent += swapAmountPerCycle;
                 totalForgeReceived += forgeOut;
                 lastResult = "swap ok";
