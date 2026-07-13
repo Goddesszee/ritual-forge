@@ -226,7 +226,7 @@
 
   .request-area{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
   .request-area label{margin-bottom:8px;}
-  .request-area input{margin-bottom:10px;}
+  .request-area input, .request-area textarea{margin-bottom:10px;resize:vertical;font-family:inherit;}
   .response-box{
     background:var(--panel);border:1px solid var(--line);border-radius:8px;
     padding:12px 14px;margin-top:10px;font-size:13px;line-height:1.6;
@@ -538,15 +538,16 @@
   <div class="hero">
     <div class="eyebrow">Agent-native companies</div>
     <h2>Forge a company that <em>runs itself</em></h2>
-    <p class="lede">Each company you forge gets its own treasury. It wakes itself up on a Scheduler loop and answers paid requests through the Ritual LLM precompile. No server, no keeper, no you.</p>
+    <p class="lede">Deploy a small company that wakes itself up on Ritual's Scheduler and answers paid requests through the TEE-attested LLM precompile — no off-chain server, no keeper bot, no oracle you have to trust. The verdict is cryptographically tied to the exact model call that produced it, so anyone can check it wasn't faked off-chain.</p>
+    <p class="lede" style="margin-top:8px;">A ready-made example below: an <strong>airdrop / allowlist risk scorer</strong> — the kind of sybil-detection judgment call protocols pay analytics vendors for today, except here it's verifiable, pay-per-call, and never goes down.</p>
   </div>
 
   <div class="panel">
     <h3>Deploy a new company</h3>
     <label>Company type</label>
-    <input id="companyType" placeholder="e.g. Reputation Scorer" />
+    <input id="companyType" placeholder="e.g. Airdrop Risk Scorer" />
     <label>System prompt (defines its job)</label>
-    <textarea id="systemPrompt" placeholder="You are a wallet reputation scorer. Given a wallet address and context, return a score from 0-1000 with brief reasoning."></textarea>
+    <textarea id="systemPrompt" placeholder="You are an airdrop eligibility risk scorer. You'll be given a wallet address plus on-chain context (age, tx count, funding source, interaction diversity) supplied by the caller. Reply with STRICT JSON only, no prose outside it: {&quot;score&quot;: 0-1000 (1000 = safest), &quot;tier&quot;: &quot;low&quot;|&quot;medium&quot;|&quot;high&quot;, &quot;flags&quot;: [short strings for suspicious patterns], &quot;reasoning&quot;: one sentence}."></textarea>
     <label>Fee per request (RITUAL)</label>
     <input id="feePerRequest" type="number" step="0.0001" value="0.001" />
     <label>Initial treasury funding (RITUAL)</label>
@@ -900,7 +901,7 @@ async function loadCompanies() {
         <div data-field="startArea"></div>
         <div class="request-area" data-field="requestArea">
           <label>Test this company (pay <span data-field="feeLabel">–</span> RITUAL)</label>
-          <input type="text" data-field="requestInput" placeholder="e.g. 0x86b245d0b48bbdc58f08caea971a24ba377c366a" />
+          <textarea data-field="requestInput" rows="3" placeholder="e.g. Wallet 0x86b245d0b48bbdc58f08caea971a24ba377c366a — 4 days old, 3 transactions, funded directly from a centralized exchange, no prior protocol interactions."></textarea>
           <button class="btn small-btn" data-field="requestBtn">Send request</button>
           <div class="status-line" data-field="requestStatus"></div>
           <div class="response-box" data-field="responseBox" style="display:none;"></div>
@@ -997,7 +998,7 @@ async function requestService(addr, card, fee) {
     statusEl.textContent = "Response received.";
     statusEl.className = "status-line ok";
     responseBox.style.display = "block";
-    responseBox.textContent = output || "(no output captured, check the transaction on the explorer)";
+    renderResponse(responseBox, output);
     input.value = "";
     hydrateCompanyCard(card, addr);
   } catch (e) {
@@ -1006,6 +1007,40 @@ async function requestService(addr, card, fee) {
     statusEl.className = "status-line err";
   } finally {
     btn.disabled = false;
+  }
+}
+
+/// Renders a company's response. If it parses as the {score, tier, flags,
+/// reasoning} shape (the convention used by the Airdrop Risk Scorer
+/// default prompt), shows a proper score card. Any other shape — or a
+/// company with a totally different system prompt — just falls back to
+/// showing the raw text, so this stays generic rather than assuming
+/// every company returns JSON.
+function renderResponse(box, output) {
+  if (!output) {
+    box.textContent = "(no output captured, check the transaction on the explorer)";
+    return;
+  }
+  let parsed = null;
+  try {
+    const jsonMatch = output.match(/\{[\s\S]*\}/);
+    if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
+  } catch (e) { /* not JSON, fall through to plain text */ }
+
+  if (parsed && typeof parsed.score !== "undefined") {
+    const tier = String(parsed.tier || "").toLowerCase();
+    const tierClass = tier === "low" ? "ready" : tier === "high" ? "empty" : "";
+    const flags = Array.isArray(parsed.flags) ? parsed.flags : [];
+    box.innerHTML = `
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:700;">${escapeHtml(String(parsed.score))}</span>
+        <span class="pool-pill ${tierClass}">${escapeHtml(tier || "unrated")}</span>
+      </div>
+      ${flags.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">${flags.map(f => `<span class="pool-pill">${escapeHtml(String(f))}</span>`).join("")}</div>` : ""}
+      ${parsed.reasoning ? `<div style="font-size:13px;color:var(--muted);">${escapeHtml(String(parsed.reasoning))}</div>` : ""}
+    `;
+  } else {
+    box.textContent = output;
   }
 }
 
@@ -1318,7 +1353,7 @@ const HELP_KB = [
   {
     topic: "How do I deploy a company?",
     keywords: ["deploy", "create company", "forge company", "new company", "how do i deploy"],
-    answer: "Fill in Company type (a short label like 'Reputation Scorer'), a System prompt (what the LLM should do when paid), a Fee per request in RITUAL, and Initial treasury funding in RITUAL. Then click 'Forge company' and confirm the transaction in your wallet."
+    answer: "Fill in Company type (a short label like 'Airdrop Risk Scorer'), a System prompt (what the LLM should do when paid), a Fee per request in RITUAL, and Initial treasury funding in RITUAL. Then click 'Forge company' and confirm the transaction in your wallet."
   },
   {
     topic: "What does Start company do?",
