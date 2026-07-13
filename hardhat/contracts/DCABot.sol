@@ -87,8 +87,8 @@ contract DCABot {
         _;
     }
 
-    constructor(address _swapAddress, address _forgeToken, uint256 _swapAmountPerCycle) payable {
-        owner = msg.sender;
+    constructor(address _owner, address _swapAddress, address _forgeToken, uint256 _swapAmountPerCycle) payable {
+        owner = _owner;
         swapAddress = _swapAddress;
         forgeToken = _forgeToken;
         swapAmountPerCycle = _swapAmountPerCycle;
