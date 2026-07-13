@@ -76,7 +76,14 @@ contract AutonomousCompany {
     string internal constant MODEL = "zai-org/GLM-4.7-FP8";
 
     uint32 public constant WAKE_INTERVAL = 500; // ~3 min on Ritual testnet
-    uint256 public constant SCHEDULER_FEE_DEPOSIT = 0.005 ether; // initial deposit at start()
+    // Scheduler escrows the full worst-case cost upfront: gas * maxFeePerGas
+    // * numCalls = 800,000 * 20 gwei * 3 = 0.048 RITUAL exactly (see
+    // _scheduleWakeupCall). The old 0.005 RITUAL deposit was ~10x short of
+    // that — confirmed via RitualWallet.balanceOf() against a live stuck
+    // company — and was the true root cause of every 0x13a6fe64 revert,
+    // not the earlier signature/parameter guesses. Set comfortably above
+    // the 0.048 RITUAL floor so real gas variance doesn't reintroduce it.
+    uint256 public constant SCHEDULER_FEE_DEPOSIT = 0.06 ether; // initial deposit at start()
     uint256 public constant SCHEDULER_LOCK_DURATION = 50000;
     uint256 public constant WAKE_TOPUP_AMOUNT = 0.0005 ether; // small trickle top-up every wake
 
