@@ -604,12 +604,13 @@ const CONFIG = {
   rpcUrl: "https://rpc.ritualfoundation.org",
   chainName: "Ritual Chain Testnet",
   explorer: "https://explorer.ritualfoundation.org",
-  factoryAddress: "0xAb502250737bf8a42517a6a5E1961237f3d5Ec43",
-  // Redeployed 2026-07-10 with scheduler params matching Ritual's own
-  // official "AutonomousAgent" reference example exactly (numCalls=3,
-  // fixed 20/2 gwei fees) instead of the earlier guessed values.
-  forgeTokenAddress: "0xe1FB91836655308335760DD51f71B151fE5D5e07",
-  swapAddress: "0x39E2FC2adF5350CdA65a1a64Dd42A9CAbCD8c7C5",
+  factoryAddress: "0x57FF23b8900De7f8DBf7654e06D36B059CA8bdff",
+  // Redeployed 2026-07-13 with the REAL fix confirmed via on-chain
+  // measurement: RitualWallet balance was 0.005 RITUAL vs 0.048 RITUAL
+  // required to escrow Scheduler.schedule() (800k gas * 20 gwei * 3
+  // numCalls). SCHEDULER_FEE_DEPOSIT bumped to 0.06 RITUAL.
+  forgeTokenAddress: "0x36C4Deea3e3122de87c841D8A0DF5C5D88a10407",
+  swapAddress: "0x82042FA52c2b3c3Fe43257717152Ea218A03CAc1",
 };
 
 const FACTORY_ABI = [
