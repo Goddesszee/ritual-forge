@@ -604,13 +604,14 @@ const CONFIG = {
   rpcUrl: "https://rpc.ritualfoundation.org",
   chainName: "Ritual Chain Testnet",
   explorer: "https://explorer.ritualfoundation.org",
-  factoryAddress: "0x57FF23b8900De7f8DBf7654e06D36B059CA8bdff",
-  // Redeployed 2026-07-13 with the REAL fix confirmed via on-chain
-  // measurement: RitualWallet balance was 0.005 RITUAL vs 0.048 RITUAL
-  // required to escrow Scheduler.schedule() (800k gas * 20 gwei * 3
-  // numCalls). SCHEDULER_FEE_DEPOSIT bumped to 0.06 RITUAL.
-  forgeTokenAddress: "0x36C4Deea3e3122de87c841D8A0DF5C5D88a10407",
-  swapAddress: "0x82042FA52c2b3c3Fe43257717152Ea218A03CAc1",
+  factoryAddress: "0x2b5AD9eBC59BAF2d722410c53ebb3c5d095Cc039",
+  // Redeployed 2026-07-13 with executor fallback: _callLLM now tries
+  // every registered TEEServiceRegistry executor in turn instead of only
+  // ever services[0], since a single stale-attestation executor could
+  // permanently break every call (matched the "failed to get cert hash
+  // from registry" failures seen in production).
+  forgeTokenAddress: "0x70EAEef2e7332889e889340C3e91a1090A410B50",
+  swapAddress: "0x819F3d7E3fF78DcC37F345DBFc30237C1Ff845b4",
 };
 
 const FACTORY_ABI = [
