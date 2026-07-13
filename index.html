@@ -556,26 +556,24 @@
     <div class="status-line" id="deployStatus"></div>
   </div>
 
-  <div class="panel" id="dcaBotPanel">
-    <h3>DCA Bot <span class="pool-pill" id="dcaBotStatusPill">loading…</span></h3>
+  <div class="panel">
+    <h3>Deploy a DCA Bot</h3>
     <p style="font-size:12.5px;color:var(--muted);margin:-6px 0 16px;">
-      Self-scheduling agent — DCAs a fixed amount of RITUAL into FORGE every cycle via the swap pool.
-      Uses only Scheduler + the swap contract, no LLM precompile involved.
+      A self-scheduling agent that DCAs a fixed amount of RITUAL into FORGE every cycle via the swap pool.
+      Uses only Scheduler + the swap contract — no LLM precompile involved, so it isn't affected by
+      TEE executor availability.
     </p>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
-      <div class="gauge"><div class="val" id="dcaCycles">–</div><div class="lbl">Cycles</div></div>
-      <div class="gauge"><div class="val" id="dcaSpent">–</div><div class="lbl">Ritual spent</div></div>
-      <div class="gauge"><div class="val" id="dcaReceived">–</div><div class="lbl">Forge received</div></div>
-    </div>
-    <div class="status-line" id="dcaLastResult" style="margin-bottom:14px;"></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn small-btn" id="dcaStartBtn" type="button">Start</button>
-      <button class="btn small-btn" id="dcaKickBtn" type="button" style="background:var(--panel-2);color:var(--accent);border:1px solid var(--line);">Kick</button>
-      <button class="btn small-btn" id="dcaStopBtn" type="button" style="background:var(--panel-2);color:var(--bad);border:1px solid var(--line);">Stop</button>
-      <button class="btn small-btn" id="dcaWithdrawBtn" type="button" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Withdraw</button>
-      <button class="btn small-btn" id="dcaRefreshBtn" type="button" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Refresh</button>
-    </div>
-    <div class="status-line" id="dcaActionStatus"></div>
+    <label>Swap amount per cycle (RITUAL)</label>
+    <input id="dcaSwapAmount" type="number" step="0.001" value="0.01" />
+    <label>Initial funding (RITUAL)</label>
+    <input id="dcaInitialFunding" type="number" step="0.01" value="0.1" />
+    <button class="btn" id="dcaDeployBtn" style="margin-top:6px;"><span class="spinner"></span><span class="btn-label">Deploy DCA Bot</span></button>
+    <div class="status-line" id="dcaDeployStatus"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Live DCA Bots <span class="count-pill" id="dcaBotCount">0</span></h3>
+    <div id="dcaBotList"></div>
   </div>
 
   <div class="panel">
@@ -637,7 +635,10 @@ const CONFIG = {
   // Deployed 2026-07-13. A self-scheduling agent that DCAs RITUAL into
   // FORGE via RitualForgeSwap — uses only Scheduler + our own swap
   // contract, no LLM precompile / TEE executor dependency at all.
-  dcaBotAddress: "0x8c4c4ab5021323a1edec7158a37408041f8d3c99",
+  dcaBotFactoryAddress: "", // fill in after running scripts/deployDCABotFactory.ts
+  // The original standalone bot from before the factory existed keeps
+  // running on its own forever — it's just not tracked by the factory's
+  // list, since it predates it: 0x8c4c4ab5021323a1edec7158a37408041f8d3c99
 };
 
 const FACTORY_ABI = [
@@ -1547,8 +1548,14 @@ helpInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") askHelp(helpInput.value);
 });
 
-// ---- DCA bot panel ----
+// ---- DCA bots (factory-driven, anyone can deploy their own) ----
+const DCA_FACTORY_ABI = [
+  "function deployBot(uint256 swapAmountPerCycle) payable returns (address)",
+  "function getAllBots() view returns (tuple(address addr, address owner, uint256 swapAmountPerCycle, uint256 createdAt)[])"
+];
 const DCA_BOT_ABI = [
+  "function owner() view returns (address)",
+  "function swapAmountPerCycle() view returns (uint256)",
   "function cycleCount() view returns (uint256)",
   "function totalRitualSpent() view returns (uint256)",
   "function totalForgeReceived() view returns (uint256)",
@@ -1560,75 +1567,168 @@ const DCA_BOT_ABI = [
   "function withdraw()"
 ];
 
-const dcaBotStatusPill = document.getElementById("dcaBotStatusPill");
-const dcaCyclesEl = document.getElementById("dcaCycles");
-const dcaSpentEl = document.getElementById("dcaSpent");
-const dcaReceivedEl = document.getElementById("dcaReceived");
-const dcaLastResultEl = document.getElementById("dcaLastResult");
-const dcaActionStatusEl = document.getElementById("dcaActionStatus");
-const dcaStartBtn = document.getElementById("dcaStartBtn");
-const dcaKickBtn = document.getElementById("dcaKickBtn");
-const dcaStopBtn = document.getElementById("dcaStopBtn");
-const dcaWithdrawBtn = document.getElementById("dcaWithdrawBtn");
-const dcaRefreshBtn = document.getElementById("dcaRefreshBtn");
-
-async function refreshDcaBot() {
-  if (!CONFIG.dcaBotAddress) {
-    dcaBotStatusPill.textContent = "not deployed";
-    return;
-  }
-  try {
-    if (!provider) provider = new ethers.BrowserProvider(window.ethereum, "any");
-    const bot = new ethers.Contract(CONFIG.dcaBotAddress, DCA_BOT_ABI, provider);
-    const [cycles, spent, received, last, isRunning] = await Promise.all([
-      bot.cycleCount(),
-      bot.totalRitualSpent(),
-      bot.totalForgeReceived(),
-      bot.lastResult(),
-      bot.running(),
-    ]);
-    dcaCyclesEl.textContent = cycles.toString();
-    dcaSpentEl.textContent = Number(ethers.formatEther(spent)).toFixed(4);
-    dcaReceivedEl.textContent = Number(ethers.formatEther(received)).toFixed(2);
-    dcaLastResultEl.textContent = last ? ("Last: " + last) : "No cycles yet.";
-    dcaBotStatusPill.textContent = isRunning ? "running" : "stopped";
-    dcaBotStatusPill.className = "pool-pill " + (isRunning ? "ready" : "empty");
-  } catch (e) {
-    console.error("DCA bot refresh failed", e);
-    dcaBotStatusPill.textContent = "error reading state";
-  }
+function setDcaDeployLoading(isLoading) {
+  const btn = document.getElementById("dcaDeployBtn");
+  btn.disabled = isLoading;
+  btn.classList.toggle("loading", isLoading);
 }
 
-async function dcaBotAction(methodName, label) {
-  if (!signer) { dcaActionStatusEl.textContent = "Connect your wallet first."; dcaActionStatusEl.className = "status-line err"; return; }
+async function deployDcaBot() {
+  const statusEl = document.getElementById("dcaDeployStatus");
+  if (!signer) { statusEl.textContent = "Connect your wallet first."; statusEl.className = "status-line err"; return; }
+  if (!CONFIG.dcaBotFactoryAddress) { statusEl.textContent = "DCA bot factory not deployed yet."; statusEl.className = "status-line err"; return; }
+
+  const swapAmount = document.getElementById("dcaSwapAmount").value;
+  const initialFunding = document.getElementById("dcaInitialFunding").value;
+  if (!swapAmount || Number(swapAmount) <= 0) { statusEl.textContent = "Enter a swap amount per cycle."; statusEl.className = "status-line err"; return; }
+
   try {
-    dcaActionStatusEl.textContent = label + ": confirm in your wallet.";
-    dcaActionStatusEl.className = "status-line";
-    const bot = new ethers.Contract(CONFIG.dcaBotAddress, DCA_BOT_ABI, signer);
-    const tx = await bot[methodName]();
-    dcaActionStatusEl.textContent = label + ": waiting for confirmation.";
+    setDcaDeployLoading(true);
+    statusEl.textContent = "Confirm the transaction in your wallet.";
+    statusEl.className = "status-line";
+    const factory = new ethers.Contract(CONFIG.dcaBotFactoryAddress, DCA_FACTORY_ABI, signer);
+    const tx = await factory.deployBot(
+      ethers.parseEther(swapAmount),
+      { value: ethers.parseEther(initialFunding || "0") }
+    );
+    statusEl.textContent = "Deploying. Waiting for confirmation.";
     const receipt = await waitForReceipt(tx.hash);
-    if (receipt.status !== "0x1") throw new Error(label + " reverted on-chain.");
-    dcaActionStatusEl.textContent = label + ": done.";
-    dcaActionStatusEl.className = "status-line ok";
-    refreshDcaBot();
+    if (receipt.status !== "0x1") throw new Error("Deployment reverted on-chain. Check the explorer for tx " + tx.hash);
+    statusEl.textContent = "DCA bot deployed. Click Start on it below to register its first wake-up.";
+    statusEl.className = "status-line ok";
+    loadDcaBots();
   } catch (e) {
     console.error(e);
-    dcaActionStatusEl.textContent = label + " failed: " + (e.shortMessage || e.message || "unknown error");
-    dcaActionStatusEl.className = "status-line err";
+    statusEl.textContent = "Deploy failed: " + (e.shortMessage || e.message || "unknown error");
+    statusEl.className = "status-line err";
+  } finally {
+    setDcaDeployLoading(false);
+  }
+}
+document.getElementById("dcaDeployBtn").addEventListener("click", deployDcaBot);
+
+async function loadDcaBots() {
+  const listEl = document.getElementById("dcaBotList");
+  const countEl = document.getElementById("dcaBotCount");
+  if (!CONFIG.dcaBotFactoryAddress) {
+    listEl.innerHTML = '<div class="empty">DCA bot factory not deployed yet.</div>';
+    return;
+  }
+  if (!provider) {
+    try { provider = new ethers.BrowserProvider(window.ethereum, "any"); } catch (e) { return; }
+  }
+  try {
+    const factory = new ethers.Contract(CONFIG.dcaBotFactoryAddress, DCA_FACTORY_ABI, provider);
+    const all = await factory.getAllBots();
+    countEl.textContent = all.length;
+
+    if (all.length === 0) {
+      listEl.innerHTML = '<div class="empty">No DCA bots deployed yet. Be the first.</div>';
+      return;
+    }
+
+    listEl.innerHTML = "";
+    const grid = document.createElement("div");
+    grid.style.display = "grid";
+    grid.style.gap = "14px";
+    listEl.appendChild(grid);
+
+    for (const info of all) {
+      const card = document.createElement("div");
+      card.className = "company-card";
+      card.innerHTML = `
+        <div class="card-head">
+          <div>
+            <div class="card-title">DCA Bot</div>
+            <div class="card-addr">${info.addr}</div>
+          </div>
+          <div class="live-dot" data-field="dot" title="checking status"></div>
+        </div>
+        <div class="gauges">
+          <div class="gauge"><div class="val" data-field="cycles">–</div><div class="lbl">Cycles</div></div>
+          <div class="gauge"><div class="val" data-field="spent">–</div><div class="lbl">Ritual spent</div></div>
+          <div class="gauge"><div class="val" data-field="received">–</div><div class="lbl">Forge received</div></div>
+        </div>
+        <div class="log-row" data-field="lastResult"></div>
+        <div data-field="actionArea"></div>
+      `;
+      grid.appendChild(card);
+      hydrateDcaBotCard(card, info.addr);
+    }
+  } catch (e) {
+    console.error(e);
+    listEl.innerHTML = '<div class="empty">Could not load DCA bots. Check that CONFIG.dcaBotFactoryAddress is set and you are on Ritual testnet.</div>';
   }
 }
 
-dcaStartBtn.addEventListener("click", () => dcaBotAction("start", "Start"));
-dcaKickBtn.addEventListener("click", () => dcaBotAction("kick", "Kick"));
-dcaStopBtn.addEventListener("click", () => dcaBotAction("stop", "Stop"));
-dcaWithdrawBtn.addEventListener("click", () => dcaBotAction("withdraw", "Withdraw"));
-dcaRefreshBtn.addEventListener("click", refreshDcaBot);
+async function hydrateDcaBotCard(card, addr) {
+  try {
+    const bot = new ethers.Contract(addr, DCA_BOT_ABI, provider);
+    const [cycles, spent, received, last, isRunning, ownerAddr] = await Promise.all([
+      bot.cycleCount(), bot.totalRitualSpent(), bot.totalForgeReceived(),
+      bot.lastResult().catch(() => ""), bot.running(), bot.owner()
+    ]);
+    card.querySelector('[data-field="cycles"]').textContent = cycles.toString();
+    card.querySelector('[data-field="spent"]').textContent = Number(ethers.formatEther(spent)).toFixed(4);
+    card.querySelector('[data-field="received"]').textContent = Number(ethers.formatEther(received)).toFixed(2);
+    card.querySelector('[data-field="lastResult"]').textContent = last ? ('"' + last + '"') : "no cycles yet.";
+
+    const dot = card.querySelector('[data-field="dot"]');
+    const actionArea = card.querySelector('[data-field="actionArea"]');
+    const isOwner = userAddress && ownerAddr.toLowerCase() === userAddress.toLowerCase();
+
+    if (isRunning) {
+      dot.style.background = "var(--good)";
+      dot.title = "running, self-scheduled";
+    } else {
+      dot.style.background = "var(--bad)";
+      dot.style.animation = "none";
+      dot.title = "not started yet";
+    }
+
+    actionArea.innerHTML = `
+      <div style="border-top:1px solid var(--line);padding-top:12px;margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn small-btn" data-action="start" ${isOwner && !isRunning ? "" : "disabled"}>Start</button>
+        <button class="btn small-btn" data-action="kick" ${isOwner && isRunning ? "" : "disabled"} style="background:var(--panel-2);color:var(--accent);border:1px solid var(--line);">Kick</button>
+        <button class="btn small-btn" data-action="stop" ${isOwner && isRunning ? "" : "disabled"} style="background:var(--panel-2);color:var(--bad);border:1px solid var(--line);">Stop</button>
+        <button class="btn small-btn" data-action="withdraw" ${isOwner ? "" : "disabled"} style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Withdraw</button>
+      </div>
+      <div class="status-line" data-field="actionStatus">${isOwner ? "" : "Only this bot's owner can control it."}</div>
+    `;
+    actionArea.querySelectorAll("button[data-action]").forEach((btn) => {
+      btn.addEventListener("click", () => dcaBotAction(addr, card, btn.dataset.action));
+    });
+  } catch (e) {
+    console.error("hydrate failed for DCA bot", addr, e);
+  }
+}
+
+async function dcaBotAction(addr, card, methodName) {
+  const statusEl = card.querySelector('[data-field="actionStatus"]');
+  if (!signer) { statusEl.textContent = "Connect your wallet first."; statusEl.className = "status-line err"; return; }
+  const label = methodName.charAt(0).toUpperCase() + methodName.slice(1);
+  try {
+    statusEl.textContent = label + ": confirm in your wallet.";
+    statusEl.className = "status-line";
+    const bot = new ethers.Contract(addr, DCA_BOT_ABI, signer);
+    const tx = await bot[methodName]();
+    statusEl.textContent = label + ": waiting for confirmation.";
+    const receipt = await waitForReceipt(tx.hash);
+    if (receipt.status !== "0x1") throw new Error(label + " reverted on-chain.");
+    statusEl.textContent = label + ": done.";
+    statusEl.className = "status-line ok";
+    hydrateDcaBotCard(card, addr);
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = label + " failed: " + (e.shortMessage || e.message || "unknown error");
+    statusEl.className = "status-line err";
+  }
+}
 
 window.addEventListener("load", () => {
   loadCompanies();
   refreshPoolStatus();
-  refreshDcaBot();
+  loadDcaBots();
 });
 </script>
 </body>
