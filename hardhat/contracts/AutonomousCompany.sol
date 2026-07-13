@@ -362,17 +362,38 @@ contract AutonomousCompany {
         // registry" on every attempt, while Scheduler itself stayed active
         // for other addresses the whole time.
         ITEEServiceRegistry.TEEService[] memory services = _getExecutors();
+        string memory lastError = "";
         for (uint256 i = 0; i < services.length; i++) {
             (bool ok, bool hadError, string memory outContent, string memory outError) =
                 _tryLLMCall(services[i].node.teeAddress, messagesJson, maxTokens);
-            if (ok) {
-                return (hadError, outContent, outError);
+            // Advance to the next executor on EITHER kind of failure: the
+            // call reverting outright, OR the call succeeding at the EVM
+            // level but the model/executor itself reporting an error (this
+            // is the shape a stale-attestation/cert-hash-registry failure
+            // actually takes — it's not a revert, it's a successful call
+            // carrying an internal error message). My first version of
+            // this fallback only checked for the former, so it never
+            // actually reached executor #2 in production.
+            if (ok && !hadError) {
+                return (false, outContent, outError);
             }
-            // this executor failed outright (not just "model returned an
-            // error" — the precompile call itself didn't succeed) — move
-            // on and try the next registered executor.
+            lastError = hadError ? outError : "LLM precompile call failed";
         }
-        return (true, "", "All registered executors failed (last resort: registry may be degraded)");
+        return (true, "", string(abi.encodePacked("All ", _uintToString(services.length), " registered executor(s) failed. Last error: ", lastError)));
+    }
+
+    function _uintToString(uint256 v) internal pure returns (string memory) {
+        if (v == 0) return "0";
+        uint256 digits;
+        uint256 temp = v;
+        while (temp != 0) { digits++; temp /= 10; }
+        bytes memory buffer = new bytes(digits);
+        while (v != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + (v % 10)));
+            v /= 10;
+        }
+        return string(buffer);
     }
 
     function _tryLLMCall(address executor, string memory messagesJson, uint256 maxTokens)
