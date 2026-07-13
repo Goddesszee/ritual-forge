@@ -556,6 +556,28 @@
     <div class="status-line" id="deployStatus"></div>
   </div>
 
+  <div class="panel" id="dcaBotPanel">
+    <h3>DCA Bot <span class="pool-pill" id="dcaBotStatusPill">loading…</span></h3>
+    <p style="font-size:12.5px;color:var(--muted);margin:-6px 0 16px;">
+      Self-scheduling agent — DCAs a fixed amount of RITUAL into FORGE every cycle via the swap pool.
+      Uses only Scheduler + the swap contract, no LLM precompile involved.
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+      <div class="gauge"><div class="val" id="dcaCycles">–</div><div class="lbl">Cycles</div></div>
+      <div class="gauge"><div class="val" id="dcaSpent">–</div><div class="lbl">Ritual spent</div></div>
+      <div class="gauge"><div class="val" id="dcaReceived">–</div><div class="lbl">Forge received</div></div>
+    </div>
+    <div class="status-line" id="dcaLastResult" style="margin-bottom:14px;"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn small-btn" id="dcaStartBtn" type="button">Start</button>
+      <button class="btn small-btn" id="dcaKickBtn" type="button" style="background:var(--panel-2);color:var(--accent);border:1px solid var(--line);">Kick</button>
+      <button class="btn small-btn" id="dcaStopBtn" type="button" style="background:var(--panel-2);color:var(--bad);border:1px solid var(--line);">Stop</button>
+      <button class="btn small-btn" id="dcaWithdrawBtn" type="button" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Withdraw</button>
+      <button class="btn small-btn" id="dcaRefreshBtn" type="button" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Refresh</button>
+    </div>
+    <div class="status-line" id="dcaActionStatus"></div>
+  </div>
+
   <div class="panel">
     <h3>Live companies <span class="count-pill" id="companyCount">0</span></h3>
     <div id="companyList"></div>
@@ -612,6 +634,10 @@ const CONFIG = {
   // checked for the latter and never actually reached executor #2.
   forgeTokenAddress: "0xD138Db50B091a0Fa639114CF37757551fbdAFa90",
   swapAddress: "0xE77408fA0292a164AC270d54C1d669314AA6EC50",
+  // Deployed 2026-07-13. A self-scheduling agent that DCAs RITUAL into
+  // FORGE via RitualForgeSwap — uses only Scheduler + our own swap
+  // contract, no LLM precompile / TEE executor dependency at all.
+  dcaBotAddress: "0x8c4c4ab5021323a1edec7158a37408041f8d3c99",
 };
 
 const FACTORY_ABI = [
@@ -1521,9 +1547,88 @@ helpInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") askHelp(helpInput.value);
 });
 
+// ---- DCA bot panel ----
+const DCA_BOT_ABI = [
+  "function cycleCount() view returns (uint256)",
+  "function totalRitualSpent() view returns (uint256)",
+  "function totalForgeReceived() view returns (uint256)",
+  "function lastResult() view returns (string)",
+  "function running() view returns (bool)",
+  "function start()",
+  "function kick()",
+  "function stop()",
+  "function withdraw()"
+];
+
+const dcaBotStatusPill = document.getElementById("dcaBotStatusPill");
+const dcaCyclesEl = document.getElementById("dcaCycles");
+const dcaSpentEl = document.getElementById("dcaSpent");
+const dcaReceivedEl = document.getElementById("dcaReceived");
+const dcaLastResultEl = document.getElementById("dcaLastResult");
+const dcaActionStatusEl = document.getElementById("dcaActionStatus");
+const dcaStartBtn = document.getElementById("dcaStartBtn");
+const dcaKickBtn = document.getElementById("dcaKickBtn");
+const dcaStopBtn = document.getElementById("dcaStopBtn");
+const dcaWithdrawBtn = document.getElementById("dcaWithdrawBtn");
+const dcaRefreshBtn = document.getElementById("dcaRefreshBtn");
+
+async function refreshDcaBot() {
+  if (!CONFIG.dcaBotAddress) {
+    dcaBotStatusPill.textContent = "not deployed";
+    return;
+  }
+  try {
+    if (!provider) provider = new ethers.BrowserProvider(window.ethereum, "any");
+    const bot = new ethers.Contract(CONFIG.dcaBotAddress, DCA_BOT_ABI, provider);
+    const [cycles, spent, received, last, isRunning] = await Promise.all([
+      bot.cycleCount(),
+      bot.totalRitualSpent(),
+      bot.totalForgeReceived(),
+      bot.lastResult(),
+      bot.running(),
+    ]);
+    dcaCyclesEl.textContent = cycles.toString();
+    dcaSpentEl.textContent = Number(ethers.formatEther(spent)).toFixed(4);
+    dcaReceivedEl.textContent = Number(ethers.formatEther(received)).toFixed(2);
+    dcaLastResultEl.textContent = last ? ("Last: " + last) : "No cycles yet.";
+    dcaBotStatusPill.textContent = isRunning ? "running" : "stopped";
+    dcaBotStatusPill.className = "pool-pill " + (isRunning ? "ready" : "empty");
+  } catch (e) {
+    console.error("DCA bot refresh failed", e);
+    dcaBotStatusPill.textContent = "error reading state";
+  }
+}
+
+async function dcaBotAction(methodName, label) {
+  if (!signer) { dcaActionStatusEl.textContent = "Connect your wallet first."; dcaActionStatusEl.className = "status-line err"; return; }
+  try {
+    dcaActionStatusEl.textContent = label + ": confirm in your wallet.";
+    dcaActionStatusEl.className = "status-line";
+    const bot = new ethers.Contract(CONFIG.dcaBotAddress, DCA_BOT_ABI, signer);
+    const tx = await bot[methodName]();
+    dcaActionStatusEl.textContent = label + ": waiting for confirmation.";
+    const receipt = await waitForReceipt(tx.hash);
+    if (receipt.status !== "0x1") throw new Error(label + " reverted on-chain.");
+    dcaActionStatusEl.textContent = label + ": done.";
+    dcaActionStatusEl.className = "status-line ok";
+    refreshDcaBot();
+  } catch (e) {
+    console.error(e);
+    dcaActionStatusEl.textContent = label + " failed: " + (e.shortMessage || e.message || "unknown error");
+    dcaActionStatusEl.className = "status-line err";
+  }
+}
+
+dcaStartBtn.addEventListener("click", () => dcaBotAction("start", "Start"));
+dcaKickBtn.addEventListener("click", () => dcaBotAction("kick", "Kick"));
+dcaStopBtn.addEventListener("click", () => dcaBotAction("stop", "Stop"));
+dcaWithdrawBtn.addEventListener("click", () => dcaBotAction("withdraw", "Withdraw"));
+dcaRefreshBtn.addEventListener("click", refreshDcaBot);
+
 window.addEventListener("load", () => {
   loadCompanies();
   refreshPoolStatus();
+  refreshDcaBot();
 });
 </script>
 </body>
