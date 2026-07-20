@@ -269,6 +269,25 @@
     font-family:'Newsreader',serif;color:var(--text);
   }
 
+  .proof-box{
+    background:var(--panel-2);border:none;box-shadow:var(--shadow-sm);
+    border-radius:8px;padding:12px 14px;margin-top:8px;
+  }
+  .proof-head{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;
+    letter-spacing:0.04em;text-transform:uppercase;color:var(--muted);
+    display:flex;align-items:center;gap:8px;margin-bottom:8px;
+  }
+  .proof-row{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    font-size:12px;font-family:'IBM Plex Mono',monospace;color:var(--muted);
+    padding:4px 0;
+  }
+  .proof-row a{color:var(--accent);text-decoration:none;}
+  .proof-row a:hover{text-decoration:underline;}
+  .mono-small{font-family:'IBM Plex Mono',monospace;color:var(--text);font-size:11.5px;}
+  .proof-note{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5;}
+
   .empty{
     text-align:center;padding:64px 20px;color:var(--muted);
     border:1.5px dashed var(--line);border-radius:12px;font-size:13.5px;
@@ -668,7 +687,10 @@ const CONFIG = {
   rpcUrl: "https://rpc.ritualfoundation.org",
   chainName: "Ritual Chain Testnet",
   explorer: "https://explorer.ritualfoundation.org",
-  factoryAddress: "0xe6D68C594050A1b88A3B9301F4a7A6A5dB37B58d",
+  // Redeployed 2026-07-20 to track and expose which TEE executor answered
+  // each request (proof of provenance per verdict, not just a claim).
+  // Companies deployed under the previous factory keep the old behavior.
+  factoryAddress: "0x0eeed877081103d38d3386a93ed698484f981f3d",
   // Redeployed 2026-07-13 with the CORRECTED executor fallback: now also
   // advances to the next executor when the model call succeeds at the EVM
   // level but reports an internal error (e.g. cert-hash-from-registry
@@ -694,7 +716,7 @@ const COMPANY_ABI = [
   "function lastHeartbeat() view returns (string)",
   "function feePerRequest() view returns (uint256)",
   "function requestService(string input) payable returns (string)",
-  "function getRecentLog() view returns (tuple(address requester,string input,string output,uint256 timestamp)[])",
+  "function getRecentLog() view returns (tuple(address requester,string input,string output,uint256 timestamp,address executor)[])",
   "function start()",
   "function owner() view returns (address)"
 ];
@@ -1044,6 +1066,7 @@ async function loadCompanies() {
           <button class="btn small-btn" data-field="requestBtn">Send request</button>
           <div class="status-line" data-field="requestStatus"></div>
           <div class="response-box" data-field="responseBox" style="display:none;"></div>
+          <div class="proof-box" data-field="proofBox" style="display:none;"></div>
         </div>
       `;
       grid.appendChild(card);
@@ -1100,6 +1123,7 @@ async function hydrateCompanyCard(card, addr) {
 async function requestService(addr, card, fee) {
   const statusEl = card.querySelector('[data-field="requestStatus"]');
   const responseBox = card.querySelector('[data-field="responseBox"]');
+  const proofBox = card.querySelector('[data-field="proofBox"]');
   const input = card.querySelector('[data-field="requestInput"]');
   const btn = card.querySelector('[data-field="requestBtn"]');
 
@@ -1110,6 +1134,7 @@ async function requestService(addr, card, fee) {
   try {
     btn.disabled = true;
     responseBox.style.display = "none";
+    proofBox.style.display = "none";
     statusEl.textContent = "Confirm the payment in your wallet.";
     statusEl.className = "status-line";
     const company = new ethers.Contract(addr, COMPANY_ABI, signer);
@@ -1128,13 +1153,19 @@ async function requestService(addr, card, fee) {
 
     // Pull the response out of the ServiceDelivered event rather than the
     // eth_call return value, since this was a real state-changing tx.
-    const iface = new ethers.Interface(["event ServiceDelivered(address indexed requester, uint256 fee, string output)"]);
+    // `executor` (added alongside per-request proof tracking) is the TEE
+    // node address that actually produced this verdict — not present on
+    // companies deployed under the old factory, in which case it comes
+    // back as the zero address and the proof block explains that.
+    const iface = new ethers.Interface(["event ServiceDelivered(address indexed requester, uint256 fee, string output, address executor)"]);
     let output = null;
+    let executor = null;
     for (const log of receipt.logs) {
       try {
         const parsed = iface.parseLog(log);
         if (parsed && parsed.name === "ServiceDelivered") {
           output = parsed.args.output;
+          executor = parsed.args.executor;
           break;
         }
       } catch (e) { /* not this event, skip */ }
@@ -1146,6 +1177,7 @@ async function requestService(addr, card, fee) {
     renderResponse(responseBox, output);
     input.value = "";
     hydrateCompanyCard(card, addr);
+    renderProofBox(proofBox, executor, tx.hash);
   } catch (e) {
     console.error(e);
     statusEl.textContent = "Request failed: " + (e.shortMessage || e.message || "unknown error");
@@ -1186,6 +1218,57 @@ function renderResponse(box, output) {
     `;
   } else {
     box.textContent = output;
+  }
+}
+
+// Struct shape here matches ITEEServiceRegistry exactly as defined in
+// AutonomousCompany.sol — not to be confused with the looser ABI stub used
+// elsewhere for the general health-check banner.
+const TEE_REGISTRY_PROOF_ABI = [
+  "function getServicesByCapability(uint8 capability, bool checkValidity) view returns (tuple(tuple(address paymentAddress,address teeAddress,uint8 teeType,bytes publicKey,string endpoint,bytes32 certPubKeyHash,uint8 capability) node, bool isValid, bytes32 workloadId)[])"
+];
+
+/// Shows which TEE node actually produced a verdict, and cross-checks it
+/// against the live TEEServiceRegistry so the claim is independently
+/// checkable rather than just displayed. `executor` comes straight out of
+/// the ServiceDelivered event for this specific tx — companies deployed
+/// under the old factory (before executor tracking existed) report the
+/// zero address here, which this explains rather than showing as an error.
+async function renderProofBox(box, executor, txHash) {
+  box.style.display = "block";
+  if (!executor || executor === ethers.ZeroAddress) {
+    box.innerHTML = `<div class="proof-head">Provenance</div><div class="proof-note">This company was deployed before per-verdict executor tracking existed, so this specific run isn't traceable to a node. Newer companies (deployed after 2026-07-20) show which TEE executor answered here.</div>`;
+    return;
+  }
+  box.innerHTML = `<div class="proof-head">Provenance</div><div class="proof-note">Checking this executor against the live TEE registry…</div>`;
+  try {
+    if (!provider) provider = new ethers.BrowserProvider(window.ethereum, "any");
+    const registry = new ethers.Contract(TEE_REGISTRY_ADDRESS, TEE_REGISTRY_PROOF_ABI, provider);
+    const services = await registry.getServicesByCapability(CAPABILITY_LLM, false);
+    const match = services.find(s => s.node.teeAddress.toLowerCase() === executor.toLowerCase());
+    const explorerLink = `${CONFIG.explorer}/address/${executor}`;
+    const txLink = `${CONFIG.explorer}/tx/${txHash}`;
+    if (match) {
+      const certShort = match.node.certPubKeyHash.slice(0, 10) + "…" + match.node.certPubKeyHash.slice(-6);
+      box.innerHTML = `
+        <div class="proof-head">Provenance ${match.isValid ? '<span class="pool-pill ready">verified</span>' : '<span class="pool-pill empty">attestation stale</span>'}</div>
+        <div class="proof-row"><span>Answered by</span><a href="${explorerLink}" target="_blank" rel="noopener">${executor.slice(0,6)}…${executor.slice(-4)}</a></div>
+        <div class="proof-row"><span>Cert pubkey hash</span><span class="mono-small">${certShort}</span></div>
+        <div class="proof-row"><span>Model</span><span class="mono-small">zai-org/GLM-4.7-FP8</span></div>
+        <div class="proof-row"><span>Transaction</span><a href="${txLink}" target="_blank" rel="noopener">view on explorer</a></div>
+        <div class="proof-note">${match.isValid ? "This node currently holds a valid TEE attestation in Ritual's on-chain registry." : "This node answered the request, but its attestation is no longer marked valid in the registry (may have rotated out since)."}</div>
+      `;
+    } else {
+      box.innerHTML = `
+        <div class="proof-head">Provenance <span class="pool-pill empty">not in current registry</span></div>
+        <div class="proof-row"><span>Answered by</span><a href="${explorerLink}" target="_blank" rel="noopener">${executor.slice(0,6)}…${executor.slice(-4)}</a></div>
+        <div class="proof-row"><span>Transaction</span><a href="${txLink}" target="_blank" rel="noopener">view on explorer</a></div>
+        <div class="proof-note">This executor was attested at the time it answered, but no longer appears in the live registry — likely rotated out since. The transaction itself is still the permanent record of which node produced this verdict.</div>
+      `;
+    }
+  } catch (e) {
+    console.error("proof lookup failed", e);
+    box.innerHTML = `<div class="proof-head">Provenance</div><div class="proof-note">Answered by <a href="${CONFIG.explorer}/address/${executor}" target="_blank" rel="noopener">${executor.slice(0,6)}…${executor.slice(-4)}</a>. Could not reach the TEE registry to verify its attestation right now — try again shortly.</div>`;
   }
 }
 
