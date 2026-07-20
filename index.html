@@ -1177,7 +1177,7 @@ async function requestService(addr, card, fee) {
     renderResponse(responseBox, output);
     input.value = "";
     hydrateCompanyCard(card, addr);
-    renderProofBox(proofBox, executor, tx.hash);
+    renderProofBox(proofBox, executor, tx.hash, output);
   } catch (e) {
     console.error(e);
     statusEl.textContent = "Request failed: " + (e.shortMessage || e.message || "unknown error");
@@ -1234,10 +1234,20 @@ const TEE_REGISTRY_PROOF_ABI = [
 /// the ServiceDelivered event for this specific tx — companies deployed
 /// under the old factory (before executor tracking existed) report the
 /// zero address here, which this explains rather than showing as an error.
-async function renderProofBox(box, executor, txHash) {
+async function renderProofBox(box, executor, txHash, output) {
   box.style.display = "block";
   if (!executor || executor === ethers.ZeroAddress) {
-    box.innerHTML = `<div class="proof-head">Provenance</div><div class="proof-note">This company was deployed before per-verdict executor tracking existed, so this specific run isn't traceable to a node. Newer companies (deployed after 2026-07-20) show which TEE executor answered here.</div>`;
+    // Zero address means one of two different things, and the wording
+    // needs to tell them apart: either this company predates executor
+    // tracking entirely (old factory), or it's on the new factory but
+    // every registered executor failed on this particular request — the
+    // contract's own error text is the tell, since it always starts with
+    // "All N registered executor(s) failed" in that case.
+    const looksLikeExecutorFailure = typeof output === "string" && /registered executor\(s\) failed/i.test(output);
+    const note = looksLikeExecutorFailure
+      ? "No executor is credited here because every registered TEE node failed to answer this request (see the response above) — there's no verdict to attribute proof to. This company does support per-verdict proof; try again once Ritual's executor is healthy."
+      : "This company was deployed before per-verdict executor tracking existed, so this specific run isn't traceable to a node. Newer companies (deployed after 2026-07-20) show which TEE executor answered here.";
+    box.innerHTML = `<div class="proof-head">Provenance</div><div class="proof-note">${note}</div>`;
     return;
   }
   box.innerHTML = `<div class="proof-head">Provenance</div><div class="proof-note">Checking this executor against the live TEE registry…</div>`;
