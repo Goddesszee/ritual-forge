@@ -109,13 +109,19 @@ contract AutonomousCompany {
         string input;
         string output;
         uint256 timestamp;
+        address executor; // TEE node (teeAddress) that actually produced this verdict
     }
     ServiceLog[] private _log;
     uint256 public constant MAX_LOG = 20;
 
+    // Executor for the most recent heartbeat wake — same proof concept as
+    // ServiceLog.executor, but heartbeats aren't paid requests so they don't
+    // get a log entry of their own.
+    address public lastHeartbeatExecutor;
+
     event CompanyStarted(uint256 atBlock);
     event WokeUp(uint256 wakeCount, uint256 atBlock, string note);
-    event ServiceDelivered(address indexed requester, uint256 fee, string output);
+    event ServiceDelivered(address indexed requester, uint256 fee, string output, address executor);
     event Withdrawn(address indexed to, uint256 amount);
     /// @notice Emitted when a wake-up succeeds but the self-reschedule fails.
     ///         The company is still `running` but has no live Scheduler
@@ -232,12 +238,15 @@ contract AutonomousCompany {
             systemPrompt,
             "Routine heartbeat check. In under 15 words, state your operating status and readiness for new requests.",
             256
-        ) returns (bool, string memory content, string memory errMsg) {
+        ) returns (bool, string memory content, string memory errMsg, address execAddr) {
             lastHeartbeat = bytes(content).length > 0 ? content : errMsg;
+            lastHeartbeatExecutor = execAddr;
         } catch Error(string memory reason) {
             lastHeartbeat = string(abi.encodePacked("llm call reverted: ", reason));
+            lastHeartbeatExecutor = address(0);
         } catch (bytes memory) {
             lastHeartbeat = "llm call reverted (no reason)";
+            lastHeartbeatExecutor = address(0);
         }
 
         // Small trickle top-up every cycle so the RitualWallet balance
@@ -341,7 +350,7 @@ contract AutonomousCompany {
 
     function _callLLM(string memory sysPrompt, string memory userContent, uint256 maxTokens)
         external
-        returns (bool hasError, string memory content, string memory errorMessage)
+        returns (bool hasError, string memory content, string memory errorMessage, address executor)
     {
         if (msg.sender != address(this)) revert OnlyOwner();
 
@@ -375,11 +384,11 @@ contract AutonomousCompany {
             // this fallback only checked for the former, so it never
             // actually reached executor #2 in production.
             if (ok && !hadError) {
-                return (false, outContent, outError);
+                return (false, outContent, outError, services[i].node.teeAddress);
             }
             lastError = hadError ? outError : "LLM precompile call failed";
         }
-        return (true, "", string(abi.encodePacked("All ", _uintToString(services.length), " registered executor(s) failed. Last error: ", lastError)));
+        return (true, "", string(abi.encodePacked("All ", _uintToString(services.length), " registered executor(s) failed. Last error: ", lastError)), address(0));
     }
 
     function _uintToString(uint256 v) internal pure returns (string memory) {
@@ -505,26 +514,28 @@ contract AutonomousCompany {
         totalRevenue += msg.value;
         requestCount++;
 
-        try this._callLLM(systemPrompt, input, 4096) returns (bool, string memory content, string memory errMsg) {
+        address execAddr;
+        try this._callLLM(systemPrompt, input, 4096) returns (bool, string memory content, string memory errMsg, address ea) {
             output = bytes(content).length > 0 ? content : errMsg;
+            execAddr = ea;
         } catch Error(string memory reason) {
             output = string(abi.encodePacked("llm call reverted: ", reason));
         } catch (bytes memory) {
             output = "llm call reverted (no reason available)";
         }
 
-        _pushLog(msg.sender, input, output);
-        emit ServiceDelivered(msg.sender, msg.value, output);
+        _pushLog(msg.sender, input, output, execAddr);
+        emit ServiceDelivered(msg.sender, msg.value, output, execAddr);
     }
 
-    function _pushLog(address requester, string memory input, string memory output) internal {
+    function _pushLog(address requester, string memory input, string memory output, address executor) internal {
         if (_log.length >= MAX_LOG) {
             for (uint256 i = 0; i < _log.length - 1; i++) {
                 _log[i] = _log[i + 1];
             }
             _log.pop();
         }
-        _log.push(ServiceLog(requester, input, output, block.timestamp));
+        _log.push(ServiceLog(requester, input, output, block.timestamp, executor));
     }
 
     function getRecentLog() external view returns (ServiceLog[] memory) {
@@ -548,3 +559,4 @@ contract AutonomousCompany {
 
     receive() external payable {}
 }
+
