@@ -82,7 +82,7 @@
     font-family:'IBM Plex Mono',monospace;
     font-size:11.5px;letter-spacing:0.04em;
     padding:8px 12px;border-radius:8px;
-    border:1px solid var(--line);background:var(--panel);
+    border:none;background:var(--panel-2);box-shadow:var(--shadow-sm);
     white-space:nowrap;
   }
   @media (max-width:560px){
@@ -100,25 +100,50 @@
   .brand .sub{font-size:10.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:0.06em;}
 
   .theme-btn{
-    background:var(--panel);border:1px solid var(--line);color:var(--text);
+    background:var(--panel-2);border:none;color:var(--text);
     width:36px;height:36px;border-radius:8px;cursor:pointer;
     display:flex;align-items:center;justify-content:center;font-size:15px;
-    transition:border-color 0.15s ease, transform 0.1s ease;
+    box-shadow:var(--shadow-sm);
+    transition:box-shadow 0.15s ease, transform 0.1s ease, color 0.15s ease;
   }
-  .theme-btn:hover{border-color:var(--accent);}
+  .theme-btn:hover{color:var(--accent);box-shadow:var(--shadow);}
   .theme-btn:active{transform:scale(0.94);}
 
+  .wallet-menu{position:relative;}
   .wallet-btn{
     background:var(--accent);
     color:var(--on-accent);border:none;
     padding:9px 18px;border-radius:8px;
     font-size:12.5px;font-weight:700;cursor:pointer;
     font-family:'IBM Plex Mono',monospace;letter-spacing:0.01em;
-    transition:filter 0.15s ease, transform 0.1s ease;
+    box-shadow:var(--shadow-sm);
+    transition:filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
   }
-  .wallet-btn:hover{filter:brightness(1.1);}
+  .wallet-btn:hover{filter:brightness(1.1);box-shadow:var(--shadow);}
   .wallet-btn:active{transform:scale(0.97);}
-  .wallet-btn.connected{background:var(--panel-2);border:1px solid var(--good);color:var(--good);}
+  .wallet-btn.connected{background:var(--panel-2);border:none;color:var(--good);}
+  .wallet-btn.connected::after{
+    content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:var(--good);margin-left:8px;vertical-align:middle;
+  }
+
+  .wallet-dropdown{
+    display:none;position:absolute;top:calc(100% + 8px);right:0;
+    min-width:180px;background:var(--panel);border-radius:10px;
+    box-shadow:var(--shadow);padding:6px;z-index:20;
+    flex-direction:column;gap:2px;
+  }
+  .wallet-dropdown.open{display:flex;}
+  .wallet-dropdown-item{
+    display:flex;align-items:center;gap:9px;
+    background:none;border:none;color:var(--text);
+    padding:9px 10px;border-radius:7px;font-size:12.5px;
+    font-family:'IBM Plex Mono',monospace;cursor:pointer;text-align:left;
+    transition:background 0.12s ease;
+  }
+  .wallet-dropdown-item:hover{background:var(--panel-2);}
+  .wallet-dropdown-item.danger{color:var(--bad);}
+  .wallet-dropdown-item.danger:hover{background:color-mix(in srgb, var(--bad) 12%, transparent);}
 
   main{max-width:920px;margin:0 auto;padding:56px 24px 80px;}
 
@@ -240,12 +265,13 @@
 
   /* ── Swap nav button ── */
   .nav-swap-btn{
-    background:none;border:1px solid var(--line);color:var(--text);
+    background:var(--panel-2);border:none;color:var(--text);
     padding:9px 16px;border-radius:8px;font-size:12.5px;font-weight:700;
     cursor:pointer;font-family:'IBM Plex Mono',monospace;letter-spacing:0.01em;
-    transition:border-color 0.15s ease, color 0.15s ease;
+    box-shadow:var(--shadow-sm);
+    transition:box-shadow 0.15s ease, color 0.15s ease;
   }
-  .nav-swap-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .nav-swap-btn:hover{color:var(--accent);box-shadow:var(--shadow);}
 
   /* ── Swap modal ── */
   .modal-backdrop{
@@ -477,7 +503,19 @@
       <span>Ritual testnet</span>
     </span>
     <button class="theme-btn" id="themeBtn" title="Toggle light and dark mode" aria-label="Toggle theme">🌙</button>
-    <button class="wallet-btn" id="connectBtn">Connect wallet</button>
+    <div class="wallet-menu" id="walletMenu">
+      <button class="wallet-btn" id="connectBtn">Connect wallet</button>
+      <div class="wallet-dropdown" id="walletDropdown">
+        <button class="wallet-dropdown-item" id="copyAddressBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span id="copyAddressLabel">Copy address</span>
+        </button>
+        <button class="wallet-dropdown-item danger" id="disconnectBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Disconnect</span>
+        </button>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -754,7 +792,45 @@ themeBtn.addEventListener("click", () => {
 });
 
 // ---- wallet connect ----
-document.getElementById("connectBtn").addEventListener("click", connectWallet);
+const walletDropdown = document.getElementById("walletDropdown");
+document.getElementById("connectBtn").addEventListener("click", () => {
+  if (userAddress) {
+    walletDropdown.classList.toggle("open");
+  } else {
+    connectWallet();
+  }
+});
+document.addEventListener("click", (e) => {
+  if (!document.getElementById("walletMenu").contains(e.target)) {
+    walletDropdown.classList.remove("open");
+  }
+});
+document.getElementById("copyAddressBtn").addEventListener("click", async () => {
+  if (!userAddress) return;
+  try {
+    await navigator.clipboard.writeText(userAddress);
+    const label = document.getElementById("copyAddressLabel");
+    label.textContent = "Copied!";
+    setTimeout(() => { label.textContent = "Copy address"; }, 1500);
+  } catch (e) {
+    console.error("copy failed", e);
+  }
+});
+document.getElementById("disconnectBtn").addEventListener("click", () => {
+  disconnectWallet();
+});
+
+function disconnectWallet() {
+  provider = undefined;
+  signer = undefined;
+  userAddress = undefined;
+  const btn = document.getElementById("connectBtn");
+  btn.textContent = "Connect wallet";
+  btn.classList.remove("connected");
+  walletDropdown.classList.remove("open");
+  loadCompanies();
+  refreshPoolStatus();
+}
 
 async function connectWallet() {
   if (!window.ethereum) {
