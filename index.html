@@ -188,6 +188,17 @@
   }
 
   label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.02em;}
+
+  .template-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+  .chip{
+    background:var(--panel-2);border:none;color:var(--muted);
+    padding:8px 14px;border-radius:100px;font-size:12px;font-weight:600;
+    cursor:pointer;font-family:'IBM Plex Mono',monospace;letter-spacing:0.01em;
+    box-shadow:var(--shadow-sm);transition:box-shadow 0.15s ease, color 0.15s ease, background 0.15s ease;
+  }
+  .chip:hover{color:var(--text);}
+  .chip.active{background:var(--accent);color:var(--on-accent);box-shadow:var(--shadow);}
+
   input, textarea{
     width:100%;background:var(--panel-2);border:1px solid var(--line);
     color:var(--text);padding:11px 13px;border-radius:8px;
@@ -584,13 +595,19 @@
     <div class="eyebrow">Agent-native companies</div>
     <h2>Forge a company that <em>runs itself</em></h2>
     <p class="lede">Deploy a small company that wakes itself up on Ritual's Scheduler and answers paid requests through the TEE-attested LLM precompile — no off-chain server, no keeper bot, no oracle you have to trust. The verdict is cryptographically tied to the exact model call that produced it, so anyone can check it wasn't faked off-chain.</p>
-    <p class="lede" style="margin-top:8px;">A ready-made example below: an <strong>airdrop / allowlist risk scorer</strong> — the kind of sybil-detection judgment call protocols pay analytics vendors for today, except here it's verifiable, pay-per-call, and never goes down.</p>
+    <p class="lede" style="margin-top:8px;">Three ready-made examples below — an <strong>airdrop / allowlist risk scorer</strong>, a <strong>dispute / claim verifier</strong>, and a <strong>content &amp; spam moderator</strong> — the kind of judgment calls protocols currently pay analytics or moderation vendors for, except here they're verifiable, pay-per-call, and never go down.</p>
   </div>
 
   <div id="executorHealthBanner" style="display:none;"></div>
 
   <div class="panel">
     <h3>Deploy a new company</h3>
+    <label>Start from a template</label>
+    <div class="template-chips" id="templateChips">
+      <button type="button" class="chip active" data-template="airdrop">Airdrop Risk Scorer</button>
+      <button type="button" class="chip" data-template="dispute">Dispute / Claim Verifier</button>
+      <button type="button" class="chip" data-template="moderator">Content &amp; Spam Moderator</button>
+    </div>
     <label>Company type</label>
     <input id="companyType" placeholder="e.g. Airdrop Risk Scorer" />
     <label>System prompt (defines its job)</label>
@@ -887,6 +904,41 @@ function setDeployLoading(loading) {
   deployBtn.classList.toggle("loading", loading);
   deployBtnLabel.textContent = loading ? "Forging" : "Forge company";
 }
+
+// ---- deploy form templates ----
+const COMPANY_TEMPLATES = {
+  airdrop: {
+    companyType: "Airdrop Risk Scorer",
+    systemPrompt: "You are an airdrop eligibility risk scorer. You'll be given a wallet address plus on-chain context (age, tx count, funding source, interaction diversity) supplied by the caller. Reply with STRICT JSON only, no prose outside it: {\"score\": 0-1000 (1000 = safest), \"tier\": \"low\"|\"medium\"|\"high\", \"flags\": [short strings for suspicious patterns], \"reasoning\": one sentence}.",
+    feePerRequest: "0.001",
+    initialFunding: "0.1"
+  },
+  dispute: {
+    companyType: "Dispute / Claim Verifier",
+    systemPrompt: "You are a dispute and claim verifier for peer-to-peer marketplace or gig-work transactions. You'll be given both parties' account of what happened plus any supplied evidence references (timestamps, message excerpts, delivery confirmations). Reply with STRICT JSON only, no prose outside it: {\"verdict\": \"buyer\"|\"seller\"|\"split\"|\"insufficient_evidence\", \"confidence\": 0-100, \"reasoning\": one to two sentences citing the specific evidence that decided it}.",
+    feePerRequest: "0.0015",
+    initialFunding: "0.1"
+  },
+  moderator: {
+    companyType: "Content & Spam Moderator",
+    systemPrompt: "You are a content and spam moderator for an on-chain or Web3-native platform. You'll be given a piece of text content plus optional context (poster's account age, posting frequency). Reply with STRICT JSON only, no prose outside it: {\"action\": \"allow\"|\"flag\"|\"remove\", \"category\": \"spam\"|\"scam\"|\"harassment\"|\"none\", \"confidence\": 0-100, \"reasoning\": one sentence}.",
+    feePerRequest: "0.0008",
+    initialFunding: "0.1"
+  }
+};
+
+document.querySelectorAll("#templateChips .chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    const tmpl = COMPANY_TEMPLATES[chip.dataset.template];
+    if (!tmpl) return;
+    document.getElementById("companyType").value = tmpl.companyType;
+    document.getElementById("systemPrompt").value = tmpl.systemPrompt;
+    document.getElementById("feePerRequest").value = tmpl.feePerRequest;
+    document.getElementById("initialFunding").value = tmpl.initialFunding;
+    document.querySelectorAll("#templateChips .chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+  });
+});
 
 // ethers v6's tx.wait() cannot parse Ritual's non-standard transaction
 // receipt fields and hangs/throws on every tx type, not just calls that
@@ -1446,7 +1498,7 @@ const HELP_KB = [
   {
     topic: "How do I deploy a company?",
     keywords: ["deploy", "create company", "forge company", "new company", "how do i deploy"],
-    answer: "Fill in Company type (a short label like 'Airdrop Risk Scorer'), a System prompt (what the LLM should do when paid), a Fee per request in RITUAL, and Initial treasury funding in RITUAL. Then click 'Forge company' and confirm the transaction in your wallet."
+    answer: "Click one of the three template chips (Airdrop Risk Scorer, Dispute/Claim Verifier, Content & Spam Moderator) to auto-fill a working example, or write your own Company type, System prompt, Fee per request, and Initial treasury funding from scratch. Then click 'Forge company' and confirm the transaction in your wallet."
   },
   {
     topic: "What does Start company do?",
