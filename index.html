@@ -566,26 +566,6 @@
   </div>
 
   <div class="panel">
-    <h3>Deploy a DCA Bot</h3>
-    <p style="font-size:12.5px;color:var(--muted);margin:-6px 0 16px;">
-      A self-scheduling agent that DCAs a fixed amount of RITUAL into FORGE every cycle via the swap pool.
-      Uses only Scheduler + the swap contract — no LLM precompile involved, so it isn't affected by
-      TEE executor availability.
-    </p>
-    <label>Swap amount per cycle (RITUAL)</label>
-    <input id="dcaSwapAmount" type="number" step="0.001" value="0.01" />
-    <label>Initial funding (RITUAL)</label>
-    <input id="dcaInitialFunding" type="number" step="0.01" value="0.1" />
-    <button class="btn" id="dcaDeployBtn" style="margin-top:6px;"><span class="spinner"></span><span class="btn-label">Deploy DCA Bot</span></button>
-    <div class="status-line" id="dcaDeployStatus"></div>
-  </div>
-
-  <div class="panel">
-    <h3>Live DCA Bots <span class="count-pill" id="dcaBotCount">0</span></h3>
-    <div id="dcaBotList"></div>
-  </div>
-
-  <div class="panel">
     <h3>Live companies <span class="count-pill" id="companyCount">0</span></h3>
     <div id="companyList"></div>
   </div>
@@ -641,13 +621,6 @@ const CONFIG = {
   // checked for the latter and never actually reached executor #2.
   forgeTokenAddress: "0xD138Db50B091a0Fa639114CF37757551fbdAFa90",
   swapAddress: "0xE77408fA0292a164AC270d54C1d669314AA6EC50",
-  // Deployed 2026-07-13. A self-scheduling agent that DCAs RITUAL into
-  // FORGE via RitualForgeSwap — uses only Scheduler + our own swap
-  // contract, no LLM precompile / TEE executor dependency at all.
-  dcaBotFactoryAddress: "", // fill in after running scripts/deployDCABotFactory.ts
-  // The original standalone bot from before the factory existed keeps
-  // running on its own forever — it's just not tracked by the factory's
-  // list, since it predates it: 0x8c4c4ab5021323a1edec7158a37408041f8d3c99
 };
 
 const FACTORY_ABI = [
@@ -1417,7 +1390,7 @@ const HELP_KB = [
   {
     topic: "Why does my request say 'cert hash from registry' or 'all executors failed'?",
     keywords: ["cert hash", "executor failed", "vllm client", "registry", "all registered executors"],
-    answer: "That's a known Ritual testnet issue, not a bug in this app — it means there's currently no healthy TEE executor available to run the LLM call. It affects company requests and heartbeats, but not the Swap or the DCA Bot, since neither uses the LLM precompile. Try again later, or use the DCA Bot in the meantime."
+    answer: "That's a known Ritual testnet issue, not a bug in this app — it means there's currently no healthy TEE executor available to run the LLM call. It affects company requests and heartbeats, but not the Swap, since that doesn't use the LLM precompile. Try again later."
   },
   {
     topic: "How do I test a company?",
@@ -1440,16 +1413,6 @@ const HELP_KB = [
     answer: "Click 'Swap' in the top nav. Pick a direction with the flip button, type an amount, and the rate updates live. It's a simple constant-product pool with a 0.3% fee — if it says 'Pool empty', there's no liquidity yet and swaps will fail until someone seeds it."
   },
   {
-    topic: "What is the DCA Bot?",
-    keywords: ["dca bot", "what is dca", "dollar cost averaging", "deploy a bot"],
-    answer: "It's a self-scheduling agent you can deploy that automatically swaps a fixed amount of RITUAL into FORGE every wake cycle, forever, with no human needed after setup. Unlike companies, it never touches the LLM precompile — it only uses Scheduler and the swap pool — so it keeps working even during a TEE executor outage."
-  },
-  {
-    topic: "How do I deploy a DCA Bot?",
-    keywords: ["deploy dca", "deploy bot", "how do i deploy a dca bot", "new dca bot"],
-    answer: "Fill in 'Swap amount per cycle' (how much RITUAL it spends each wake) and 'Initial funding' (needs to comfortably cover at least 0.06 RITUAL for the Scheduler deposit, plus extra for actual swaps), click 'Deploy DCA Bot', confirm in your wallet, then click 'Start' on the new card in the Live DCA Bots list below."
-  },
-  {
     topic: "What network do I need?",
     keywords: ["what network", "which chain", "gas token", "testnet", "wrong network"],
     answer: "Forge runs on Ritual Chain testnet (chain ID 1979). You'll need testnet RITUAL in your wallet for gas and for funding companies — it has no real value, it's for testing only."
@@ -1459,7 +1422,7 @@ const HELP_KB = [
 const HELP_TOPICS_SHOWN = [
   "What is Forge?",
   "How do I deploy a company?",
-  "What is the DCA Bot?",
+  "How does the swap work?",
   "Why does my request say 'cert hash from registry' or 'all executors failed'?",
 ];
 
@@ -1572,183 +1535,6 @@ helpInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") askHelp(helpInput.value);
 });
 
-// ---- DCA bots (factory-driven, anyone can deploy their own) ----
-const DCA_FACTORY_ABI = [
-  "function deployBot(uint256 swapAmountPerCycle) payable returns (address)",
-  "function getAllBots() view returns (tuple(address addr, address owner, uint256 swapAmountPerCycle, uint256 createdAt)[])"
-];
-const DCA_BOT_ABI = [
-  "function owner() view returns (address)",
-  "function swapAmountPerCycle() view returns (uint256)",
-  "function cycleCount() view returns (uint256)",
-  "function totalRitualSpent() view returns (uint256)",
-  "function totalForgeReceived() view returns (uint256)",
-  "function lastResult() view returns (string)",
-  "function running() view returns (bool)",
-  "function start()",
-  "function kick()",
-  "function stop()",
-  "function withdraw()"
-];
-
-function setDcaDeployLoading(isLoading) {
-  const btn = document.getElementById("dcaDeployBtn");
-  btn.disabled = isLoading;
-  btn.classList.toggle("loading", isLoading);
-}
-
-async function deployDcaBot() {
-  const statusEl = document.getElementById("dcaDeployStatus");
-  if (!signer) { statusEl.textContent = "Connect your wallet first."; statusEl.className = "status-line err"; return; }
-  if (!CONFIG.dcaBotFactoryAddress) { statusEl.textContent = "DCA bot factory not deployed yet."; statusEl.className = "status-line err"; return; }
-
-  const swapAmount = document.getElementById("dcaSwapAmount").value;
-  const initialFunding = document.getElementById("dcaInitialFunding").value;
-  if (!swapAmount || Number(swapAmount) <= 0) { statusEl.textContent = "Enter a swap amount per cycle."; statusEl.className = "status-line err"; return; }
-
-  try {
-    setDcaDeployLoading(true);
-    statusEl.textContent = "Confirm the transaction in your wallet.";
-    statusEl.className = "status-line";
-    const factory = new ethers.Contract(CONFIG.dcaBotFactoryAddress, DCA_FACTORY_ABI, signer);
-    const tx = await factory.deployBot(
-      ethers.parseEther(swapAmount),
-      { value: ethers.parseEther(initialFunding || "0") }
-    );
-    statusEl.textContent = "Deploying. Waiting for confirmation.";
-    const receipt = await waitForReceipt(tx.hash);
-    if (receipt.status !== "0x1") throw new Error("Deployment reverted on-chain. Check the explorer for tx " + tx.hash);
-    statusEl.textContent = "DCA bot deployed. Click Start on it below to register its first wake-up.";
-    statusEl.className = "status-line ok";
-    loadDcaBots();
-  } catch (e) {
-    console.error(e);
-    statusEl.textContent = "Deploy failed: " + (e.shortMessage || e.message || "unknown error");
-    statusEl.className = "status-line err";
-  } finally {
-    setDcaDeployLoading(false);
-  }
-}
-document.getElementById("dcaDeployBtn").addEventListener("click", deployDcaBot);
-
-async function loadDcaBots() {
-  const listEl = document.getElementById("dcaBotList");
-  const countEl = document.getElementById("dcaBotCount");
-  if (!CONFIG.dcaBotFactoryAddress) {
-    listEl.innerHTML = '<div class="empty">DCA bot factory not deployed yet.</div>';
-    return;
-  }
-  if (!provider) {
-    try { provider = new ethers.BrowserProvider(window.ethereum, "any"); } catch (e) { return; }
-  }
-  try {
-    const factory = new ethers.Contract(CONFIG.dcaBotFactoryAddress, DCA_FACTORY_ABI, provider);
-    const all = await factory.getAllBots();
-    countEl.textContent = all.length;
-
-    if (all.length === 0) {
-      listEl.innerHTML = '<div class="empty">No DCA bots deployed yet. Be the first.</div>';
-      return;
-    }
-
-    listEl.innerHTML = "";
-    const grid = document.createElement("div");
-    grid.style.display = "grid";
-    grid.style.gap = "14px";
-    listEl.appendChild(grid);
-
-    for (const info of all) {
-      const card = document.createElement("div");
-      card.className = "company-card";
-      card.innerHTML = `
-        <div class="card-head">
-          <div>
-            <div class="card-title">DCA Bot</div>
-            <div class="card-addr">${info.addr}</div>
-          </div>
-          <div class="live-dot" data-field="dot" title="checking status"></div>
-        </div>
-        <div class="gauges">
-          <div class="gauge"><div class="val" data-field="cycles">–</div><div class="lbl">Cycles</div></div>
-          <div class="gauge"><div class="val" data-field="spent">–</div><div class="lbl">Ritual spent</div></div>
-          <div class="gauge"><div class="val" data-field="received">–</div><div class="lbl">Forge received</div></div>
-        </div>
-        <div class="log-row" data-field="lastResult"></div>
-        <div data-field="actionArea"></div>
-      `;
-      grid.appendChild(card);
-      hydrateDcaBotCard(card, info.addr);
-    }
-  } catch (e) {
-    console.error(e);
-    listEl.innerHTML = '<div class="empty">Could not load DCA bots. Check that CONFIG.dcaBotFactoryAddress is set and you are on Ritual testnet.</div>';
-  }
-}
-
-async function hydrateDcaBotCard(card, addr) {
-  try {
-    const bot = new ethers.Contract(addr, DCA_BOT_ABI, provider);
-    const [cycles, spent, received, last, isRunning, ownerAddr] = await Promise.all([
-      bot.cycleCount(), bot.totalRitualSpent(), bot.totalForgeReceived(),
-      bot.lastResult().catch(() => ""), bot.running(), bot.owner()
-    ]);
-    card.querySelector('[data-field="cycles"]').textContent = cycles.toString();
-    card.querySelector('[data-field="spent"]').textContent = Number(ethers.formatEther(spent)).toFixed(4);
-    card.querySelector('[data-field="received"]').textContent = Number(ethers.formatEther(received)).toFixed(2);
-    card.querySelector('[data-field="lastResult"]').textContent = last ? ('"' + last + '"') : "no cycles yet.";
-
-    const dot = card.querySelector('[data-field="dot"]');
-    const actionArea = card.querySelector('[data-field="actionArea"]');
-    const isOwner = userAddress && ownerAddr.toLowerCase() === userAddress.toLowerCase();
-
-    if (isRunning) {
-      dot.style.background = "var(--good)";
-      dot.title = "running, self-scheduled";
-    } else {
-      dot.style.background = "var(--bad)";
-      dot.style.animation = "none";
-      dot.title = "not started yet";
-    }
-
-    actionArea.innerHTML = `
-      <div style="border-top:1px solid var(--line);padding-top:12px;margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn small-btn" data-action="start" ${isOwner && !isRunning ? "" : "disabled"}>Start</button>
-        <button class="btn small-btn" data-action="kick" ${isOwner && isRunning ? "" : "disabled"} style="background:var(--panel-2);color:var(--accent);border:1px solid var(--line);">Kick</button>
-        <button class="btn small-btn" data-action="stop" ${isOwner && isRunning ? "" : "disabled"} style="background:var(--panel-2);color:var(--bad);border:1px solid var(--line);">Stop</button>
-        <button class="btn small-btn" data-action="withdraw" ${isOwner ? "" : "disabled"} style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">Withdraw</button>
-      </div>
-      <div class="status-line" data-field="actionStatus">${isOwner ? "" : "Only this bot's owner can control it."}</div>
-    `;
-    actionArea.querySelectorAll("button[data-action]").forEach((btn) => {
-      btn.addEventListener("click", () => dcaBotAction(addr, card, btn.dataset.action));
-    });
-  } catch (e) {
-    console.error("hydrate failed for DCA bot", addr, e);
-  }
-}
-
-async function dcaBotAction(addr, card, methodName) {
-  const statusEl = card.querySelector('[data-field="actionStatus"]');
-  if (!signer) { statusEl.textContent = "Connect your wallet first."; statusEl.className = "status-line err"; return; }
-  const label = methodName.charAt(0).toUpperCase() + methodName.slice(1);
-  try {
-    statusEl.textContent = label + ": confirm in your wallet.";
-    statusEl.className = "status-line";
-    const bot = new ethers.Contract(addr, DCA_BOT_ABI, signer);
-    const tx = await bot[methodName]();
-    statusEl.textContent = label + ": waiting for confirmation.";
-    const receipt = await waitForReceipt(tx.hash);
-    if (receipt.status !== "0x1") throw new Error(label + " reverted on-chain.");
-    statusEl.textContent = label + ": done.";
-    statusEl.className = "status-line ok";
-    hydrateDcaBotCard(card, addr);
-  } catch (e) {
-    console.error(e);
-    statusEl.textContent = label + " failed: " + (e.shortMessage || e.message || "unknown error");
-    statusEl.className = "status-line err";
-  }
-}
-
 // ---- Live executor health check ----
 // Reads TEEServiceRegistry directly on-chain rather than hardcoding a
 // status message, so this stays accurate automatically once Ritual
@@ -1768,7 +1554,7 @@ async function checkExecutorHealth() {
     if (services.length === 0) {
       banner.style.display = "block";
       banner.className = "exec-health-banner";
-      banner.innerHTML = "<strong>Heads up:</strong> Ritual currently has zero healthy registered LLM executors on testnet. Deploying and testing companies still works, but AI-powered responses (company requests and heartbeats) will fail with a \"cert hash from registry\" error until Ritual restores executor availability — this is on their end, not this app. The Swap and DCA Bot are unaffected, since neither uses the LLM precompile.";
+      banner.innerHTML = "<strong>Heads up:</strong> Ritual currently has zero healthy registered LLM executors on testnet. Deploying and testing companies still works, but AI-powered responses (company requests and heartbeats) will fail with a \"cert hash from registry\" error until Ritual restores executor availability — this is on their end, not this app. The Swap is unaffected, since it doesn't use the LLM precompile.";
     } else {
       banner.style.display = "none";
     }
@@ -1784,7 +1570,6 @@ async function checkExecutorHealth() {
 window.addEventListener("load", () => {
   loadCompanies();
   refreshPoolStatus();
-  loadDcaBots();
   checkExecutorHealth();
 });
 </script>
